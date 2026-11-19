@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 AstraLibernis
+//
+// Dense layer forward with ReLU, 256 inputs to 256 outputs. One invocation per (row, output):
+// the dot product of the row with that output's weights, 64 loads of four values.
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) readonly buffer Inputs { vec4 x[]; };
+layout(set = 0, binding = 1) readonly buffer Weights { vec4 w[]; };
+layout(set = 0, binding = 2) readonly buffer Biases { float bias[]; };
+layout(set = 0, binding = 3) writeonly buffer Outputs { float y[]; };
+
+layout(push_constant) uniform Push {
+    uint rows;
+} pc;
+
+void main() {
+    uint o = gl_GlobalInvocationID.x;
+    uint r = gl_GlobalInvocationID.y;
+    if (o >= 256u || r >= pc.rows) return;
+    vec4 acc = vec4(0.0);
+    for (uint q = 0u; q < 64u; q++) acc += x[r * 64u + q] * w[o * 64u + q];
+    y[r * 256u + o] = max(bias[o] + ((acc.x + acc.y) + (acc.z + acc.w)), 0.0);
+}

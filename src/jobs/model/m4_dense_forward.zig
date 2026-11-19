@@ -15,6 +15,8 @@ const std = @import("std");
 const harness = @import("../../harness.zig");
 const data = @import("../../data.zig");
 const Env = harness.Env;
+const gpu_kit = @import("../../gpu_kit.zig");
+const Compute = gpu_kit.Compute;
 
 const width = 256;
 const lanes = 16;
@@ -32,6 +34,10 @@ const Input = struct {
     /// Starts on a cache line and every row is whole lines, so threads that own different rows
     /// never write the same line.
     y: []align(line) f32,
+    /// Buffers on the graphics card, made the first time a GPU variant runs.
+    card: ?Compute = null,
+    /// The GPU result checked in the untimed run; reported again while the result stays on the card.
+    card_answer: f64 = 0,
 };
 
 fn of(p: *anyopaque) *Input {
@@ -63,6 +69,7 @@ fn create(gpa: std.mem.Allocator, n: usize) anyerror!*anyopaque {
 
 fn destroy(gpa: std.mem.Allocator, p: *anyopaque) void {
     const in = of(p);
+    if (in.card) |*c| c.deinit();
     gpa.free(in.y);
     gpa.free(in.wt);
     gpa.free(in.w);
@@ -194,6 +201,8 @@ pub const job: harness.Job = .{
         .{ .name = "scaled", .what = "weights stored input by input; all outputs of a row grow together, fused", .run = scaled },
         .{ .name = "threads8", .what = "scaled, rows shared out over 8 threads", .run = Threads(8).run, .threads = true },
         .{ .name = "threads16", .what = "scaled, rows shared out over 16 threads", .run = Threads(16).run, .threads = true },
+        .{ .name = "gpu", .what = "graphics card, data already on it, result left on it", .run = onCard, .gpu = true },
+        .{ .name = "gpu+transfer", .what = "graphics card, from main memory and back", .run = withTransfer, .gpu = true },
     },
 };
 
@@ -220,9 +229,65 @@ test "M4: a layer worked out by hand, including the clamp at zero" {
     @memset(in.x[width..], -1);
     // Row 0: output o = 1 + (o + 1); sum over o = 256 + 256 * 257 / 2. Row 1: all negative: 0.
     for (job.variants) |v| {
+        if (v.gpu) continue; // checked against the reference in the test above
         try std.testing.expectEqual(@as(f64, 256 + 32896), try v.run(&env, p));
         try std.testing.expectEqual(@as(f32, 2), in.y[0]);
         try std.testing.expectEqual(@as(f32, 257), in.y[255]);
         try std.testing.expectEqual(@as(f32, 0), in.y[width]);
     }
+}
+
+// --- GPU -----------------------------------------------------------------------------------------
+// One invocation per (row, output): the dot product of the row with that output's weights, read
+// four values at a time.
+
+const spirv align(@alignOf(u32)) = @embedFile("m4_dense.spv").*;
+const Push = extern struct { rows: u32 };
+
+fn stage(in: *Input, c: *Compute) void {
+    @memcpy(c.input(0, f32), in.x);
+    @memcpy(c.input(1, f32), in.w);
+    @memcpy(c.input(2, f32), &in.bias);
+}
+
+/// The card-side state, created on first use with inputs, weights and biases already uploaded.
+fn card(env: *Env, in: *Input) !*Compute {
+    if (in.batch > 65535) return error.BatchTooLargeForOneDispatch;
+    if (in.card == null) {
+        const g = try env.gpu();
+        const row_bytes = in.batch * width * @sizeOf(f32);
+        var c = try Compute.init(g, &spirv, &.{ row_bytes, width * width * @sizeOf(f32), width * @sizeOf(f32) }, &.{row_bytes}, @sizeOf(Push));
+        errdefer c.deinit();
+        stage(in, &c);
+        try c.uploadOnly();
+        in.card = c;
+    }
+    return &in.card.?;
+}
+
+fn dispatch(in: *Input, c: *Compute, move: Compute.Move) !void {
+    const push: Push = .{ .rows = @intCast(in.batch) };
+    try c.run(&push, .{ width / 64, @intCast(in.batch), 1 }, move);
+}
+
+/// Everything already on the card, outputs left on the card: the dispatch alone.
+fn onCard(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.batch == 0) return 0;
+    const c = try card(env, in);
+    try dispatch(in, c, .{});
+    if (env.timing) return in.card_answer;
+    try c.download();
+    in.card_answer = answerOf(c.output(0, f32));
+    return in.card_answer;
+}
+
+/// From main memory (inputs, weights and biases) to the outputs back in main memory.
+fn withTransfer(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.batch == 0) return 0;
+    const c = try card(env, in);
+    stage(in, c);
+    try dispatch(in, c, .{ .upload = true, .download = true });
+    return answerOf(c.output(0, f32));
 }

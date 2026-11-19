@@ -12,7 +12,7 @@ this way or that way?" is looked up instead of guessed.
 - Numbers and what they mean: [`docs/measurements.md`](docs/measurements.md)
 
 Status: the harness, 20 jobs (data processing D1 to D5, data science S1 to S6, model learning
-M1 to M6) and the
+M1 to M6, five of them also on the graphics card) and the
 lookup are done.
 
 ```sh
@@ -26,7 +26,10 @@ zig-out/bin/zstrata-bench look group total --rows 1e7      # the measured answer
 zig-out/bin/zstrata-bench map                              # all answers to map/<machine>.tsv
 ```
 
-Needs Zig 0.17.x. zstrata is fetched as a package by the build; its thread pool is
+Needs Zig 0.17.x and, to build, the shader compiler `glslc` (set `VKPREFIX` to the folder that
+holds `bin/glslc`). The GPU variants need a Vulkan 1.3 graphics card; without one they are
+reported as failed and everything else still runs. zstrata is fetched as a package by the
+build; its thread pool and Vulkan layer are
 used as a library. All inputs are generated examples; the repository holds no real data.
 
 GPL-3.0-or-later. See `COPYING`.

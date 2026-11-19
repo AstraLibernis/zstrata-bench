@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S6	gpu+transfer	134217728	1984600.000	1949600.000	0.0182	31	6.7630e10	33580363.660980225	9e21ec10cb66c72f	0.17.1

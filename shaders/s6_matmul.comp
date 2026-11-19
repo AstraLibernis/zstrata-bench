@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 AstraLibernis
+//
+// Matrix product, one invocation per element of the result: the dot product of row i of the
+// first matrix with row j of the second matrix stored transposed. Both are read four values at
+// a time; rows are padded with zeros to a whole number of fours.
+#version 460
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) readonly buffer First { vec4 a[]; };
+layout(set = 0, binding = 1) readonly buffer SecondTransposed { vec4 bt[]; };
+layout(set = 0, binding = 2) writeonly buffer Product { float c[]; };
+
+layout(push_constant) uniform Push {
+    uint side;
+    uint quads; // fours per row
+} pc;
+
+void main() {
+    uint i = gl_GlobalInvocationID.y;
+    uint j = gl_GlobalInvocationID.x;
+    if (i >= pc.side || j >= pc.side) return;
+    vec4 acc = vec4(0.0);
+    for (uint q = 0u; q < pc.quads; q++) acc += a[i * pc.quads + q] * bt[j * pc.quads + q];
+    c[i * pc.side + j] = (acc.x + acc.y) + (acc.z + acc.w);
+}

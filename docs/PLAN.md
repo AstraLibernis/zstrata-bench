@@ -1,6 +1,6 @@
 # zstrata-bench plan
 
-Status: **B0 to B4 done** (2026-11-19): harness, the map and `look`, and 20 jobs on the CPU: data D1 to D5, data science S1 to S6, model learning M1 to M6. Next: B5 (GPU variants).
+Status: **B0 to B5 done** (2026-11-19): harness, the map and `look`, 20 jobs on the CPU (data D1 to D5, data science S1 to S6, model learning M1 to M6), and GPU variants for S5, S6, M3, M4 and M6. Next: B6 (remaining data jobs D6, D7).
 
 ## What this is
 
@@ -144,7 +144,7 @@ Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` tick
   command. Write the short "how to read an answer" page.
 - **B3 Data science ✓ (2026-11-19).** S1 to S4, then S5 and S6 on CPU.
 - **B4 Model learning ✓ (2026-11-19).** Bring M3, M4, M6 over from zstrata; add M1, M2, M5.
-- **B5 GPU variants.** Add the device choice to the jobs where it can win (S5, S6, M3 to M6), with
+- **B5 GPU variants ✓ (2026-11-19, without M5 and without the best-practice checks in tests: see docs/measurements.md).** Add the device choice to the jobs where it can win (S5, S6, M3 to M6), with
   and without transfer cost, and the best-practices layer on in tests.
 - **B6 Remaining data jobs.** D6, D7.
 - **B7 LLM and zmural slices.** Only when that work is live.

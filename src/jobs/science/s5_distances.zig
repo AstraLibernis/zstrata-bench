@@ -15,6 +15,8 @@ const std = @import("std");
 const harness = @import("../../harness.zig");
 const data = @import("../../data.zig");
 const Env = harness.Env;
+const gpu_kit = @import("../../gpu_kit.zig");
+const Compute = gpu_kit.Compute;
 
 const dims = 8;
 const lanes = 16;
@@ -36,6 +38,10 @@ const Input = struct {
     /// Point after point: dims floats each.
     rows: []f32,
     slots: []Slot,
+    /// Buffers on the graphics card, made the first time a GPU variant runs.
+    card: ?Compute = null,
+    /// The GPU result checked in the untimed run; reported again while the result stays on the card.
+    card_answer: f64 = 0,
 };
 
 fn of(p: *anyopaque) *Input {
@@ -68,6 +74,7 @@ fn create(gpa: std.mem.Allocator, n: usize) anyerror!*anyopaque {
 
 fn destroy(gpa: std.mem.Allocator, p: *anyopaque) void {
     const in = of(p);
+    if (in.card) |*c| c.deinit();
     gpa.free(in.slots);
     gpa.free(in.rows);
     for (in.dim) |d| gpa.free(d);
@@ -194,6 +201,8 @@ pub const job: harness.Job = .{
         .{ .name = "points16", .what = "one array per dimension, 16 other points at a time", .run = acrossPoints },
         .{ .name = "threads8", .what = "points16 on 8 threads", .run = Threads(8).run, .threads = true },
         .{ .name = "threads16", .what = "points16 on 16 threads", .run = Threads(16).run, .threads = true },
+        .{ .name = "gpu", .what = "graphics card, data already on it, result left on it", .run = onCard, .gpu = true },
+        .{ .name = "gpu+transfer", .what = "graphics card, from main memory and back", .run = withTransfer, .gpu = true },
     },
 };
 
@@ -221,5 +230,61 @@ test "S5: nearest distances of points placed by hand" {
         }
     }
     // Nearest squared distances: 1, 1, 4, 16.
-    for (job.variants) |v| try std.testing.expectEqual(@as(f64, 22), try v.run(&env, p));
+    for (job.variants) |v| {
+        if (!harness.runnable(&env, &v)) continue;
+        try std.testing.expectEqual(@as(f64, 22), try v.run(&env, p));
+    }
+}
+
+// --- GPU -----------------------------------------------------------------------------------------
+// One invocation per point, looping over all the others. The card reads the point-after-point
+// copy as it is: each point is two 16-byte loads.
+
+const spirv align(@alignOf(u32)) = @embedFile("s5_distances.spv").*;
+const Push = extern struct { points: u32 };
+
+/// The card-side state, created on first use with the points already uploaded.
+fn card(env: *Env, in: *Input) !*Compute {
+    if (in.card == null) {
+        const g = try env.gpu();
+        var c = try Compute.init(g, &spirv, &.{in.points * dims * @sizeOf(f32)}, &.{in.points * @sizeOf(f32)}, @sizeOf(Push));
+        errdefer c.deinit();
+        @memcpy(c.input(0, f32), in.rows);
+        try c.uploadOnly();
+        in.card = c;
+    }
+    return &in.card.?;
+}
+
+fn cardAnswer(c: *const Compute) f64 {
+    var total: f64 = 0;
+    for (c.output(0, f32)) |d| total += d;
+    return total;
+}
+
+fn dispatch(in: *Input, c: *Compute, move: Compute.Move) !void {
+    const push: Push = .{ .points = @intCast(in.points) };
+    try c.run(&push, .{ @intCast((in.points + 63) / 64), 1, 1 }, move);
+}
+
+/// Points already on the card, distances left on the card: the dispatch alone.
+fn onCard(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.points < 2) return 0;
+    const c = try card(env, in);
+    try dispatch(in, c, .{});
+    if (env.timing) return in.card_answer;
+    try c.download();
+    in.card_answer = cardAnswer(c);
+    return in.card_answer;
+}
+
+/// From points in main memory to the distances back in main memory.
+fn withTransfer(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.points < 2) return 0;
+    const c = try card(env, in);
+    @memcpy(c.input(0, f32), in.rows);
+    try dispatch(in, c, .{ .upload = true, .download = true });
+    return cardAnswer(c);
 }

@@ -19,6 +19,8 @@ const std = @import("std");
 const harness = @import("../../harness.zig");
 const data = @import("../../data.zig");
 const Env = harness.Env;
+const gpu_kit = @import("../../gpu_kit.zig");
+const Compute = gpu_kit.Compute;
 
 const lanes = 16;
 const Vec = @Vector(lanes, f32);
@@ -45,6 +47,10 @@ const Input = struct {
     w2: Out,
     m2: Out,
     v2: Out,
+    /// Buffers on the graphics card, made the first time a GPU variant runs.
+    card: ?Compute = null,
+    /// The GPU result checked in the untimed run; reported again while the result stays on the card.
+    card_answer: f64 = 0,
 };
 
 fn of(p: *anyopaque) *Input {
@@ -81,6 +87,7 @@ fn create(gpa: std.mem.Allocator, n: usize) anyerror!*anyopaque {
 
 fn destroy(gpa: std.mem.Allocator, p: *anyopaque) void {
     const in = of(p);
+    if (in.card) |*c| c.deinit();
     gpa.free(in.v2);
     gpa.free(in.m2);
     gpa.free(in.w2);
@@ -176,7 +183,8 @@ pub const job: harness.Job = .{
     .bytes_per_item = 7 * @sizeOf(f32),
     .sizes = &.{ 10_000, 1_000_000, 50_000_000 },
     .quick_sizes = &.{ 1_000, 200_000 },
-    .tolerance = 0,
+    // The card's square root and division may round the last bit differently.
+    .tolerance = 1e-6,
     .source = @embedFile("m6_adam_step.zig"),
     .create = create,
     .destroy = destroy,
@@ -186,6 +194,8 @@ pub const job: harness.Job = .{
         .{ .name = "lanes16", .what = "one loop, 16 parameters at a time", .run = Serial(wideRange).run },
         .{ .name = "threads8", .what = "lanes16 over blocks on 8 threads", .run = Threads(8).run, .threads = true },
         .{ .name = "threads16", .what = "lanes16 over blocks on 16 threads", .run = Threads(16).run, .threads = true },
+        .{ .name = "gpu", .what = "graphics card, data already on it, result left on it", .run = onCard, .gpu = true },
+        .{ .name = "gpu+transfer", .what = "graphics card, from main memory and back", .run = withTransfer, .gpu = true },
     },
 };
 
@@ -211,6 +221,7 @@ test "M6: every variant writes exactly the same three arrays" {
         const v = try gpa.dupe(f32, in.v2);
         defer gpa.free(v);
         for (job.variants[1..]) |variant| {
+            if (variant.gpu) continue; // the card writes its own buffers and may round differently
             @memset(in.w2, 0);
             @memset(in.m2, 0);
             @memset(in.v2, 0);
@@ -238,4 +249,74 @@ test "M6: one parameter worked out by hand" {
     try std.testing.expectApproxEqRel(@as(f32, 0.004), in.v2[0], 1e-4);
     try std.testing.expectEqual(rest2 * 4.0, in.v2[0]);
     try std.testing.expectApproxEqRel(@as(f32, 1.0 - 0.001 * 0.2 / 0.0632455532), in.w2[0], 1e-6);
+}
+
+// --- GPU -----------------------------------------------------------------------------------------
+// Four parameters per invocation. Arrays are padded with zeros to a whole number of fours.
+
+const spirv align(@alignOf(u32)) = @embedFile("m6_adam.spv").*;
+const Push = extern struct { quads: u32, span: u32, beta1: f32, beta2: f32, rest1: f32, rest2: f32, rate: f32, tiny: f32 };
+
+fn stage(in: *Input, c: *Compute) void {
+    const n = in.w.len;
+    for ([_][]const f32{ in.w, in.m, in.v, in.g }, 0..) |src, k| {
+        const dst = c.input(k, f32);
+        @memcpy(dst[0..n], src);
+        @memset(dst[n..], 0);
+    }
+}
+
+/// The card-side state, created on first use with the four input arrays already uploaded.
+fn card(env: *Env, in: *Input) !*Compute {
+    if (in.card == null) {
+        const g = try env.gpu();
+        const bytes = (in.w.len + 3) / 4 * 4 * @sizeOf(f32);
+        var c = try Compute.init(g, &spirv, &.{ bytes, bytes, bytes, bytes }, &.{ bytes, bytes, bytes }, @sizeOf(Push));
+        errdefer c.deinit();
+        stage(in, &c);
+        try c.uploadOnly();
+        in.card = c;
+    }
+    return &in.card.?;
+}
+
+fn dispatch(in: *Input, c: *Compute, move: Compute.Move) !void {
+    const quads = (in.w.len + 3) / 4;
+    const groups = gpu_kit.groupsFor(quads, 64);
+    const push: Push = .{ .quads = @intCast(quads), .span = groups.span, .beta1 = beta1, .beta2 = beta2, .rest1 = rest1, .rest2 = rest2, .rate = rate, .tiny = tiny };
+    try c.run(&push, groups.counts, move);
+}
+
+/// The same sample of the three outputs as `answerOf`, read from the card's results.
+fn cardAnswer(in: *const Input, c: *const Compute) f64 {
+    const n = in.w.len;
+    const w2 = c.output(0, f32);
+    const m2 = c.output(1, f32);
+    const v2 = c.output(2, f32);
+    var a: f64 = 0;
+    var i: usize = 0;
+    while (i < n) : (i += 97) a += @as(f64, w2[i]) + m2[i] + v2[i];
+    return a + w2[n - 1] + m2[n - 1] + v2[n - 1];
+}
+
+/// Arrays already on the card, results left on the card: the dispatch alone.
+fn onCard(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.w.len == 0) return 0;
+    const c = try card(env, in);
+    try dispatch(in, c, .{});
+    if (env.timing) return in.card_answer;
+    try c.download();
+    in.card_answer = cardAnswer(in, c);
+    return in.card_answer;
+}
+
+/// From four arrays in main memory to three arrays back in main memory.
+fn withTransfer(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.w.len == 0) return 0;
+    const c = try card(env, in);
+    stage(in, c);
+    try dispatch(in, c, .{ .upload = true, .download = true });
+    return cardAnswer(in, c);
 }

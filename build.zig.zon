@@ -2,14 +2,23 @@
     .name = .zstrata_bench,
     .version = "0.0.0",
     .dependencies = .{
-        // zstrata is used as a library (its thread pool). To build against a local checkout
-        // instead, replace url and hash with: .path = "../zstrata"
+        // zstrata is used as a library (its thread pool and its Vulkan layer). To build against a
+        // local checkout instead, replace url and hash with: .path = "../zstrata"
         .zstrata = .{
             .url = "git+https://github.com/AstraLibernis/zstrata#61eb42f85aa04e459b3c8f76f76ca26c1b8978b7",
             .hash = "zstrata-0.0.0-1cYpdXPAAwDJN3i26RtbuCA0iv3hXrsUf49R3ohScBO-",
         },
+        // The same Vulkan bindings and headers zstrata is built with.
+        .vulkan = .{
+            .url = "git+https://github.com/Snektron/vulkan-zig?ref=zig-0.17-compat#1fa628fd49d89468241c2cab14bad41a312e79fc",
+            .hash = "vulkan-0.0.0-r7Ytxy2BAwCPqBJUCXp6XXMwWqFD3DNrMLWWQvRRSXOC",
+        },
+        .vulkan_headers = .{
+            .url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.341.tar.gz",
+            .hash = "N-V-__8AABJ5QgLfX-rcpaOGlg1YXcabW-m5cl5HEKkRsi3f",
+        },
     },
     .minimum_zig_version = "0.17.0",
-    .paths = .{ "build.zig", "build.zig.zon", "src", "verify", "COPYING" },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "shaders", "verify", "COPYING" },
     .fingerprint = 0x73ad9836e57adf79,
 }

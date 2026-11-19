@@ -437,3 +437,53 @@ identical bits.]
   it (M3); the arithmetic form is the predictable choice.
 - Two tricks from elsewhere made things worse on this data: alternating tables (M1) and walking
   several rows side by side (M3). Measure before keeping a trick.
+
+## Graphics card against the CPU (2026-11-19)
+
+Radeon RX 9070 XT through Vulkan compute. Five jobs have two GPU variants each:
+**on the card** (data already in video memory, result left there: the dispatch alone) and
+**with transfer** (from main memory, to the card, and back, in one submit). Times in
+milliseconds for one run, next to the best CPU variants. Every GPU variant agrees with the
+reference and with NumPy.
+
+| Job and size | Best on one thread | 16 threads | GPU, on the card | GPU, with transfer |
+|---|---|---|---|---|
+| S5 distances, 1,000 points | 0.121 | 0.084 | 0.200 | 0.228 |
+| S5 distances, 16,000 points | 31.6 | 5.13 | 1.87 | 1.74 |
+| S6 matrix multiply, side 128 | 0.095 | 0.015 | 0.070 | 0.195 |
+| S6 matrix multiply, side 1024 | 24.9 | 4.17 | 1.03 | 9.59 |
+| M3 tree inference, 1,000 rows | 0.447 | 0.158 | 0.214 | 0.226 |
+| M3 tree inference, 1,000,000 rows | 449 | 62.1 | 2.04 | 4.99 |
+| M4 dense forward, 64 rows | 0.138 | 0.024 | 0.075 | 0.115 |
+| M4 dense forward, 32,768 rows | 60.5 | 11.9 | 2.75 | 10.2 |
+| M6 Adam step, 10,000 parameters | 0.002 | 0.002 | 0.070 | 0.089 |
+| M6 Adam step, 50,000,000 parameters | 35.2 | 32.3 | 2.59 | 82.9 |
+
+[MEASURED, `run S5`, `run S6`, `run M3`, `run M4`, `run M6`; spread under 15% for the GPU rows
+shown, under 6% for most.]
+
+What to do:
+
+- **Small jobs stay on the CPU.** Every dispatch costs about 0.07 ms before any work is done. At
+  the smallest size of every job the CPU wins, by up to 35x (the Adam step on 10,000 parameters).
+  [MEASURED]
+- **If the data can live on the card, the card wins every large job:** 2.7x over 16 threads for
+  distances, 4x for matrix multiply and the dense layer, 12x for the Adam step, 30x for tree
+  inference. [MEASURED]
+- **Whether it still wins after the round trip depends on how much data moves per unit of work.**
+  - Distances and tree inference move little and compute a lot: with transfer the card is still
+    2.9x and 12x ahead of 16 threads.
+  - Matrix multiply and the dense layer move megabytes for milliseconds of work: with transfer
+    the card is 2.3x behind 16 threads for the matrix and level with them for the dense layer.
+  - The Adam step moves 1.4 GB to do 2.6 ms of work: with transfer it takes 83 ms, 2.6x slower
+    than the CPU, against 12x faster when the data stays put. [MEASURED]
+- **So the placement rule is about where the data lives between steps**, not about the kernel.
+  A training loop that keeps parameters, moments and gradients on the card gets the 12x; one that
+  brings them back each step loses to the CPU. This is zstrata's playbook rule 4, measured here on
+  whole jobs.
+- **Tree inference is the surprise.** Nothing on the CPU beat 2.2 million rows per second on one
+  thread; the card does 490 million. Each row walks 100 trees independently, which suits
+  thousands of small cores.
+
+Not measured: a GPU variant of the weight update (M5), and the shaders are first versions (no
+tuning of workgroup size or shared memory), so the GPU numbers are a floor, not a ceiling.

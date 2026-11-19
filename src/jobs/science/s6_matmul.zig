@@ -18,6 +18,7 @@ const std = @import("std");
 const harness = @import("../../harness.zig");
 const data = @import("../../data.zig");
 const Env = harness.Env;
+const Compute = @import("../../gpu_kit.zig").Compute;
 
 const line = std.atomic.cache_line;
 
@@ -32,10 +33,82 @@ const Input = struct {
     /// Starts on a cache line. With a side that is a multiple of 32 every row is whole lines,
     /// so threads that own different rows never write the same line.
     c: []align(line) f32,
+    /// Buffers on the graphics card, made the first time a GPU variant runs.
+    card: ?Compute = null,
+    /// The GPU result checked in the untimed run; reported again while the result stays on the card.
+    card_answer: f64 = 0,
 };
 
 fn of(p: *anyopaque) *Input {
     return @ptrCast(@alignCast(p));
+}
+
+// --- GPU -----------------------------------------------------------------------------------------
+// One invocation per element of the result: the dot product of a row of the first matrix with a
+// column of the second. The second matrix is stored column by column on the card, and both are
+// read four values at a time, so rows are padded with zeros to a multiple of four.
+
+const spirv align(@alignOf(u32)) = @embedFile("s6_matmul.spv").*;
+const Push = extern struct { side: u32, quads: u32 };
+
+fn quadsOf(side: usize) usize {
+    return (side + 3) / 4;
+}
+
+/// Writes both matrices into the staging buffer in the card's layout.
+fn stage(in: *Input, c: *Compute) void {
+    const n = in.side;
+    const padded = quadsOf(n) * 4;
+    const a = c.input(0, f32);
+    const bt = c.input(1, f32);
+    @memset(a, 0);
+    @memset(bt, 0);
+    for (0..n) |i| @memcpy(a[i * padded ..][0..n], in.a[i * n ..][0..n]);
+    for (0..n) |k| {
+        for (0..n) |j| bt[j * padded + k] = in.b[k * n + j];
+    }
+}
+
+/// The card-side state, created on first use with the inputs already uploaded.
+fn card(env: *Env, in: *Input) !*Compute {
+    if (in.card == null) {
+        const g = try env.gpu();
+        const row_bytes = in.side * quadsOf(in.side) * 4 * @sizeOf(f32);
+        var c = try Compute.init(g, &spirv, &.{ row_bytes, row_bytes }, &.{in.side * in.side * @sizeOf(f32)}, @sizeOf(Push));
+        errdefer c.deinit();
+        stage(in, &c);
+        try c.uploadOnly();
+        in.card = c;
+    }
+    return &in.card.?;
+}
+
+fn dispatch(in: *Input, c: *Compute, move: Compute.Move) !void {
+    const push: Push = .{ .side = @intCast(in.side), .quads = @intCast(quadsOf(in.side)) };
+    const groups: u32 = @intCast((in.side + 7) / 8);
+    try c.run(&push, .{ groups, groups, 1 }, move);
+}
+
+/// Data already on the card, result left on the card: the dispatch alone.
+fn onCard(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.side == 0) return 0;
+    const c = try card(env, in);
+    try dispatch(in, c, .{});
+    if (env.timing) return in.card_answer;
+    try c.download();
+    in.card_answer = answerOf(c.output(0, f32));
+    return in.card_answer;
+}
+
+/// From matrices in main memory to the product back in main memory.
+fn withTransfer(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.side == 0) return 0;
+    const c = try card(env, in);
+    stage(in, c);
+    try dispatch(in, c, .{ .upload = true, .download = true });
+    return answerOf(c.output(0, f32));
 }
 
 fn sideFor(n: usize) usize {
@@ -60,6 +133,7 @@ fn create(gpa: std.mem.Allocator, n: usize) anyerror!*anyopaque {
 
 fn destroy(gpa: std.mem.Allocator, p: *anyopaque) void {
     const in = of(p);
+    if (in.card) |*c| c.deinit();
     gpa.free(in.c);
     gpa.free(in.b);
     gpa.free(in.a);
@@ -211,9 +285,10 @@ pub const job: harness.Job = .{
     .bytes_per_item = 0,
     .sizes = &.{ 128 * 128 * 128, 512 * 512 * 512, 1024 * 1024 * 1024 },
     .quick_sizes = &.{ 32 * 32 * 32, 96 * 96 * 96 },
-    // The fused variants round once per multiply-add instead of twice, so their sums differ
+    // The fused variants round once per multiply-add instead of twice, and the GPU adds each
+    // element as four partial sums, so their sums differ
     // from the reference in the last bits.
-    .tolerance = 1e-6,
+    .tolerance = 1e-5,
     .source = @embedFile("s6_matmul.zig"),
     .create = create,
     .destroy = destroy,
@@ -226,6 +301,8 @@ pub const job: harness.Job = .{
         .{ .name = "fused4", .what = "fused, four rows of the second matrix per pass", .run = Tiled(.fused4).run },
         .{ .name = "threads8", .what = "fused4, result rows shared out over 8 threads", .run = Threads(8).run, .threads = true },
         .{ .name = "threads16", .what = "fused4, result rows shared out over 16 threads", .run = Threads(16).run, .threads = true },
+        .{ .name = "gpu", .what = "graphics card, matrices already on it, product left on it", .run = onCard, .gpu = true },
+        .{ .name = "gpu+transfer", .what = "graphics card, from main memory and back", .run = withTransfer, .gpu = true },
     },
 };
 
@@ -250,6 +327,7 @@ test "S6: sides, and a product worked out by hand" {
     @memcpy(in.b, &[_]f32{ 5, 6, 7, 8 });
     // [1 2; 3 4] * [5 6; 7 8] = [19 22; 43 50]
     for (job.variants) |v| {
+        if (v.gpu) continue; // checked against the reference in the test above
         try std.testing.expectEqual(@as(f64, 134), try v.run(&env, p));
         try std.testing.expectEqualSlices(f32, &.{ 19, 22, 43, 50 }, in.c);
     }

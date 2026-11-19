@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 AstraLibernis
+//
+// Tree ensemble inference: 100 trees of depth 6 (63 tests, 64 leaves each), 8 features per row.
+// One invocation per row; the leaf values are added in tree order, as on the CPU.
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) readonly buffer Rows { vec4 rows[]; };
+layout(set = 0, binding = 1) readonly buffer Features { uint feat[]; };
+layout(set = 0, binding = 2) readonly buffer Thresholds { float thr[]; };
+layout(set = 0, binding = 3) readonly buffer Leaves { float leaf[]; };
+layout(set = 0, binding = 4) writeonly buffer Sums { float sums[]; };
+
+layout(push_constant) uniform Push {
+    uint n;
+    uint span;
+} pc;
+
+void main() {
+    uint r = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * pc.span;
+    if (r >= pc.n) return;
+    vec4 lo = rows[2u * r];
+    vec4 hi = rows[2u * r + 1u];
+    float x[8] = float[8](lo.x, lo.y, lo.z, lo.w, hi.x, hi.y, hi.z, hi.w);
+    float sum = 0.0;
+    for (uint t = 0u; t < 100u; t++) {
+        uint i = 0u;
+        for (uint d = 0u; d < 6u; d++) {
+            uint at = t * 63u + i;
+            i = 2u * i + 1u + uint(x[feat[at]] > thr[at]);
+        }
+        sum += leaf[t * 64u + i - 63u];
+    }
+    sums[r] = sum;
+}

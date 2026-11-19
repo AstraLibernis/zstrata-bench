@@ -57,12 +57,20 @@ pub const Answer = struct {
     /// Variants that use one thread, in job order, and the pick among them.
     one: [max_variants]Entry = undefined,
     one_len: usize = 0,
-    /// Every variant, in job order, and the pick among them.
+    /// Every CPU variant, in job order.
     all: [max_variants]Entry = undefined,
     all_len: usize = 0,
+    /// Variants that run on the graphics card, in job order. They are reported one by one,
+    /// because "data already on the card" and "with transfers" answer different questions.
+    card: [max_variants]Entry = undefined,
+    card_len: usize = 0,
 
     pub fn oneThread(a: *const Answer) []const Entry {
         return a.one[0..a.one_len];
+    }
+
+    pub fn onCard(a: *const Answer) []const Entry {
+        return a.card[0..a.card_len];
     }
 
     pub fn everything(a: *const Answer) []const Entry {
@@ -82,6 +90,11 @@ pub fn load(gpa: std.mem.Allocator, io: std.Io, machine: []const u8, job: *const
         const saved = harness.readSaved(gpa, io, path, &the_stamp) orelse continue;
         const e: Entry = .{ .variant = v, .median_ns = saved.median_ns, .spread = saved.spread };
         if (i == 0) a.reference = e;
+        if (v.gpu) {
+            a.card[a.card_len] = e;
+            a.card_len += 1;
+            continue;
+        }
         a.all[a.all_len] = e;
         a.all_len += 1;
         if (!v.threads) {
@@ -163,6 +176,13 @@ pub fn writeAnswer(out: *std.Io.Writer, job: *const Job, a: *const Answer) !void
     } else {
         try writeLine(out, job, a, "all threads:", all, pick_all);
     }
+    // Each GPU variant, with how it compares to the best CPU answer above.
+    const best_cpu = all[pick_all].median_ns;
+    for (a.onCard()) |e| {
+        try out.print("    {s:<12} {s:<11} ", .{ "graphics:", e.variant.name });
+        try writeRate(out, rate(a.n, e.median_ns));
+        try out.print(" {s}/s, {d:.1}x the best CPU answer\n{s:<17}{s}\n", .{ job.unit, best_cpu / e.median_ns, "", e.variant.what });
+    }
 }
 
 /// True when every word appears (ignoring case) in the job's id, title or group. No words
@@ -241,6 +261,10 @@ pub fn writeMap(gpa: std.mem.Allocator, io: std.Io, machine: []const u8, jobs: [
             try writeMapRow(out, job, &a, "one", one, pick_one);
             rows += 1;
             const pick_all = choose(all).?; // `one` is not empty, so neither is `all`
+            for (a.onCard(), 0..) |_, k| {
+                try writeMapRow(out, job, &a, "gpu", a.onCard(), k);
+                rows += 1;
+            }
             if (all[pick_all].variant != one[pick_one].variant) {
                 try writeMapRow(out, job, &a, "all", all, pick_all);
                 rows += 1;

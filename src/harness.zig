@@ -7,6 +7,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 pub const Pool = @import("pool").Pool;
+pub const Gpu = @import("gpu_kit.zig").Gpu;
 
 pub const max_threads = 64;
 
@@ -19,6 +20,19 @@ pub const Env = struct {
     pools: [max_threads + 1]?*Pool = @splat(null),
     /// Tests set this to run every threaded variant on one fixed thread count.
     force_threads: u32 = 0,
+    /// True while `measure` is timing. A GPU variant that is measured with its data already on
+    /// the card checks its answer in the untimed first run (bringing the result back to do so)
+    /// and leaves the result on the card during the timed runs.
+    timing: bool = false,
+    gpu_state: ?*Gpu = null,
+
+    /// The graphics card, opened on first use and kept for the whole run. Owned by `Env`.
+    pub fn gpu(env: *Env) !*Gpu {
+        if (env.gpu_state) |g| return g;
+        const g = try Gpu.init(env.gpa);
+        env.gpu_state = g;
+        return g;
+    }
 
     /// The pool with `threads` workers (the caller is one of them). Owned by `Env`.
     pub fn pool(env: *Env, threads: u32) !*Pool {
@@ -30,11 +44,15 @@ pub const Env = struct {
         return p;
     }
 
+    /// Everything built from the card (a job's input may hold buffers on it) must be released
+    /// before this.
     pub fn deinit(env: *Env) void {
         for (&env.pools) |*slot| {
             if (slot.*) |p| p.deinit();
             slot.* = null;
         }
+        if (env.gpu_state) |g| g.deinit(env.gpa);
+        env.gpu_state = null;
     }
 };
 
@@ -48,6 +66,8 @@ pub const Variant = struct {
     /// True when the variant uses more than one thread; the map answers "one thread" and
     /// "all threads" separately.
     threads: bool = false,
+    /// True when the variant runs on the graphics card; the map lists those separately.
+    gpu: bool = false,
 };
 
 pub const Job = struct {
@@ -109,6 +129,8 @@ const max_timed_runs = 31;
 pub fn measure(env: *Env, job: *const Job, v: *const Variant, input: *anyopaque, want: f64, effort: Effort) !Measurement {
     const first = try v.run(env, input);
     if (!agrees(first, want, job.tolerance)) return error.WrongAnswer;
+    env.timing = true;
+    defer env.timing = false;
 
     // The clock ticks in steps of about 100 ns here, so a short variant is called `calls` times
     // per timed sample: enough that one sample lasts about `sample_ns`.
@@ -150,7 +172,8 @@ pub fn machineId(gpa: std.mem.Allocator) ![]u8 {
     return gpa.print("{s}-{d}t-{s}", .{ builtin.cpu.model.name, cpus, @tagName(builtin.os.tag) });
 }
 
-/// Changes whenever a saved result could be out of date: the job's source, this file, the input
+/// Changes whenever a saved result could be out of date: the job's source, this file, the GPU
+/// helpers, the input
 /// generators, the Zig
 /// version or the machine. 16 hex digits.
 pub fn stamp(job: *const Job, machine: []const u8) [16]u8 {
@@ -158,6 +181,7 @@ pub fn stamp(job: *const Job, machine: []const u8) [16]u8 {
     h.update(job.source);
     h.update(@embedFile("harness.zig"));
     h.update(@embedFile("data.zig"));
+    h.update(@embedFile("gpu_kit.zig"));
     h.update(builtin.zig_version_string);
     h.update(machine);
     var value = h.final();
@@ -226,10 +250,23 @@ pub fn expectVariantsAgree(job: *const Job, sizes: []const usize) !void {
             defer job.destroy(gpa, input);
             const want = try job.variants[0].run(&env, input);
             for (job.variants[1..]) |*v| {
+                if (v.gpu) {
+                    // GPU variants do not depend on the thread count: once is enough. Without a
+                    // card (or its loader) they are skipped, not failed.
+                    if (threads != 1) continue;
+                    _ = env.gpu() catch continue;
+                }
                 const got = try v.run(&env, input);
                 if (!agrees(got, want, job.tolerance)) {
                     std.debug.print("{s} {s} n={d} threads={d}: got {d}, reference {d}\n", .{ job.id, v.name, n, threads, got, want });
                     return error.VariantDisagrees;
+                }
+                if (v.gpu) {
+                    // The path the timed runs take must report the same answer.
+                    env.timing = true;
+                    defer env.timing = false;
+                    const again = try v.run(&env, input);
+                    if (!agrees(again, want, job.tolerance)) return error.VariantDisagrees;
                 }
             }
         }
@@ -242,4 +279,11 @@ test "agrees" {
     try std.testing.expect(agrees(0.0, 1e-10, 1e-9)); // absolute near zero
     try std.testing.expect(!agrees(std.math.nan(f64), 1.0, 1e-9));
     try std.testing.expect(!agrees(std.math.inf(f64), std.math.inf(f64), 1e-9));
+}
+
+/// False for a GPU variant when no graphics card can be opened; tests skip those.
+pub fn runnable(env: *Env, v: *const Variant) bool {
+    if (!v.gpu) return true;
+    _ = env.gpu() catch return false;
+    return true;
 }

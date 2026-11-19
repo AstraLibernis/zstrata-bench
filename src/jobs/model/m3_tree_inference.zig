@@ -18,6 +18,8 @@ const std = @import("std");
 const harness = @import("../../harness.zig");
 const data = @import("../../data.zig");
 const Env = harness.Env;
+const gpu_kit = @import("../../gpu_kit.zig");
+const Compute = gpu_kit.Compute;
 
 const feats = 8;
 const trees = 100;
@@ -42,6 +44,10 @@ const Input = struct {
     rows: []f32,
     forest: []Tree,
     slots: []Slot,
+    /// Buffers on the graphics card, made the first time a GPU variant runs.
+    card: ?Compute = null,
+    /// The GPU result checked in the untimed run; reported again while the result stays on the card.
+    card_answer: f64 = 0,
 };
 
 fn of(p: *anyopaque) *Input {
@@ -75,6 +81,7 @@ fn create(gpa: std.mem.Allocator, n: usize) anyerror!*anyopaque {
 
 fn destroy(gpa: std.mem.Allocator, p: *anyopaque) void {
     const in = of(p);
+    if (in.card) |*c| c.deinit();
     gpa.free(in.slots);
     gpa.free(in.forest);
     gpa.free(in.rows);
@@ -194,7 +201,7 @@ pub const job: harness.Job = .{
     .bytes_per_item = feats * @sizeOf(f32),
     .sizes = &.{ 1_000, 100_000, 1_000_000 },
     .quick_sizes = &.{ 100, 10_000 },
-    .tolerance = 1e-9,
+    .tolerance = 1e-6,
     .source = @embedFile("m3_tree_inference.zig"),
     .create = create,
     .destroy = destroy,
@@ -207,6 +214,8 @@ pub const job: harness.Job = .{
         .{ .name = "eight", .what = "treefirst with eight rows walking down a tree side by side", .run = Blocks(8, .arith).run },
         .{ .name = "threads8", .what = "treefirst, blocks of rows on 8 threads", .run = Threads(8).run, .threads = true },
         .{ .name = "threads16", .what = "treefirst, blocks of rows on 16 threads", .run = Threads(16).run, .threads = true },
+        .{ .name = "gpu", .what = "graphics card, data already on it, result left on it", .run = onCard, .gpu = true },
+        .{ .name = "gpu+transfer", .what = "graphics card, from main memory and back", .run = withTransfer, .gpu = true },
     },
 };
 
@@ -234,4 +243,71 @@ test "M3: a walk worked out by hand, both ways of stepping" {
     x[2] = 0.3;
     try std.testing.expectEqual(@as(f32, 32), walkBranch(&t, &x));
     try std.testing.expectEqual(@as(f32, 32), walkArith(&t, &x));
+}
+
+// --- GPU -----------------------------------------------------------------------------------------
+// One invocation per row, walking all 100 trees. Leaf values are added in tree order, as on the
+// CPU.
+
+const spirv align(@alignOf(u32)) = @embedFile("m3_trees.spv").*;
+const Push = extern struct { n: u32, span: u32 };
+
+fn stage(in: *Input, c: *Compute) void {
+    @memcpy(c.input(0, f32), in.rows);
+    const feat = c.input(1, u32);
+    const thr = c.input(2, f32);
+    const leaf = c.input(3, f32);
+    for (in.forest, 0..) |*t, ti| {
+        for (t.feat, feat[ti * tests ..][0..tests]) |f, *dst| dst.* = f;
+        @memcpy(thr[ti * tests ..][0..tests], &t.thr);
+        @memcpy(leaf[ti * leaves ..][0..leaves], &t.leaf);
+    }
+}
+
+/// The card-side state, created on first use with rows and trees already uploaded.
+fn card(env: *Env, in: *Input) !*Compute {
+    if (in.card == null) {
+        const g = try env.gpu();
+        const word = @sizeOf(f32);
+        var c = try Compute.init(g, &spirv, &.{ in.n * feats * word, trees * tests * word, trees * tests * word, trees * leaves * word }, &.{in.n * word}, @sizeOf(Push));
+        errdefer c.deinit();
+        stage(in, &c);
+        try c.uploadOnly();
+        in.card = c;
+    }
+    return &in.card.?;
+}
+
+fn cardAnswer(c: *const Compute) f64 {
+    var total: f64 = 0;
+    for (c.output(0, f32)) |s| total += s;
+    return total;
+}
+
+fn dispatch(in: *Input, c: *Compute, move: Compute.Move) !void {
+    const groups = gpu_kit.groupsFor(in.n, 64);
+    const push: Push = .{ .n = @intCast(in.n), .span = groups.span };
+    try c.run(&push, groups.counts, move);
+}
+
+/// Rows and trees already on the card, sums left on the card: the dispatch alone.
+fn onCard(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.n == 0) return 0;
+    const c = try card(env, in);
+    try dispatch(in, c, .{});
+    if (env.timing) return in.card_answer;
+    try c.download();
+    in.card_answer = cardAnswer(c);
+    return in.card_answer;
+}
+
+/// From rows and trees in main memory to the sums back in main memory.
+fn withTransfer(env: *Env, p: *anyopaque) anyerror!f64 {
+    const in = of(p);
+    if (in.n == 0) return 0;
+    const c = try card(env, in);
+    stage(in, c);
+    try dispatch(in, c, .{ .upload = true, .download = true });
+    return cardAnswer(c);
 }

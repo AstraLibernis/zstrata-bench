@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 AstraLibernis
+//
+// One Adam step, four parameters per invocation. The constants come from the program so that
+// they are the same 32-bit values the CPU variants use.
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) readonly buffer W { vec4 w[]; };
+layout(set = 0, binding = 1) readonly buffer M { vec4 m[]; };
+layout(set = 0, binding = 2) readonly buffer V { vec4 v[]; };
+layout(set = 0, binding = 3) readonly buffer G { vec4 g[]; };
+layout(set = 0, binding = 4) writeonly buffer W2 { vec4 w2[]; };
+layout(set = 0, binding = 5) writeonly buffer M2 { vec4 m2[]; };
+layout(set = 0, binding = 6) writeonly buffer V2 { vec4 v2[]; };
+
+layout(push_constant) uniform Push {
+    uint quads;
+    uint span;
+    float beta1;
+    float beta2;
+    float rest1;
+    float rest2;
+    float rate;
+    float tiny;
+} pc;
+
+void main() {
+    uint i = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * pc.span;
+    if (i >= pc.quads) return;
+    vec4 grad = g[i];
+    vec4 mm = pc.beta1 * m[i] + pc.rest1 * grad;
+    vec4 vv = pc.beta2 * v[i] + pc.rest2 * grad * grad;
+    m2[i] = mm;
+    v2[i] = vv;
+    w2[i] = w[i] - pc.rate * mm / (sqrt(vv) + pc.tiny);
+}

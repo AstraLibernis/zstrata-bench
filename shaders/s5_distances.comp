@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 AstraLibernis
+//
+// Nearest other point for every point, 8 dimensions. One invocation per point; a point is two
+// 16-byte loads.
+#version 460
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) readonly buffer Points { vec4 p[]; };
+layout(set = 0, binding = 1) writeonly buffer Nearest { float nearest[]; };
+
+layout(push_constant) uniform Push {
+    uint points;
+} pc;
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.points) return;
+    vec4 lo = p[2u * i];
+    vec4 hi = p[2u * i + 1u];
+    float best = 3.0e38;
+    for (uint j = 0u; j < pc.points; j++) {
+        vec4 d0 = p[2u * j] - lo;
+        vec4 d1 = p[2u * j + 1u] - hi;
+        float d2 = dot(d0, d0) + dot(d1, d1);
+        if (j != i) best = min(best, d2);
+    }
+    nearest[i] = best;
+}
