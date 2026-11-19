@@ -22,7 +22,7 @@ zig-out/bin/zstrata-bench run D1                           # measure; each resul
 zig-out/bin/zstrata-bench check                            # what is saved, stale or missing
 ```
 
-Needs Zig 0.17.x and a checkout of zstrata next to this folder (`../zstrata`); its thread pool is
+Needs Zig 0.17.x. zstrata is fetched as a package by the build; its thread pool is
 used as a library. All inputs are generated examples; the repository holds no real data.
 
 GPL-3.0-or-later. See `COPYING`.

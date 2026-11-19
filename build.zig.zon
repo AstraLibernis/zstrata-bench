@@ -2,8 +2,12 @@
     .name = .zstrata_bench,
     .version = "0.0.0",
     .dependencies = .{
-        // A checkout of github.com/AstraLibernis/zstrata next to this one.
-        .zstrata = .{ .path = "../zstrata" },
+        // zstrata is used as a library (its thread pool). To build against a local checkout
+        // instead, replace url and hash with: .path = "../zstrata"
+        .zstrata = .{
+            .url = "git+https://github.com/AstraLibernis/zstrata#0e5ecf438ee11081ba65ab07c52c957ad79acea4",
+            .hash = "zstrata-0.0.0-1cYpdXPAAwDJN3i26RtbuCA0iv3hXrsUf49R3ohScBO-",
+        },
     },
     .minimum_zig_version = "0.17.0",
     .paths = .{ "build.zig", "build.zig.zon", "src", "verify", "COPYING" },
