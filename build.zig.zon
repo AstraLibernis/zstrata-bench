@@ -1,0 +1,11 @@
+.{
+    .name = .zstrata_bench,
+    .version = "0.0.0",
+    .dependencies = .{
+        // A checkout of github.com/AstraLibernis/zstrata next to this one.
+        .zstrata = .{ .path = "../zstrata" },
+    },
+    .minimum_zig_version = "0.17.0",
+    .paths = .{ "build.zig", "build.zig.zon", "src", "verify", "COPYING" },
+    .fingerprint = 0x73ad9836e57adf79,
+}

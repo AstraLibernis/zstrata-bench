@@ -1,6 +1,6 @@
 # zstrata-bench plan
 
-Status: **planned, nothing built yet** (written 2026-11-19). Read `GUIDE.md` for how to work on it.
+Status: **B0 done** (2026-11-19): harness, saved results, quick mode and job D1. Next: B1. Read `GUIDE.md` for how to work on it.
 
 ## What this is
 
@@ -131,7 +131,7 @@ tasks and are brought over, not rewritten.
 
 Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` ticked.
 
-- **B0 Skeleton.** Build file, the harness (timing, repeats, spread, disturbance check), seeded
+- **B0 Skeleton ✓ (2026-11-19).** Build file, the harness (timing, repeats, spread, disturbance check), seeded
   input generators, per-entry saved results, `--quick`, and job D1 end to end including the outside
   check. Proves the whole path with the simplest job.
 - **Z1 Profile export (in zstrata).** `zstrata profile` writes the facts zstrata-bench needs as one
