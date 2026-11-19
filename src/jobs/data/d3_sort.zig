@@ -144,8 +144,8 @@ pub const job: harness.Job = .{
         .{ .name = "pdq", .what = "std.sort.pdq (quicksort family)", .run = pdq },
         .{ .name = "radix8", .what = "radix sort, 8 bits per pass (4 passes)", .run = Radix(8).run },
         .{ .name = "radix11", .what = "radix sort, 11 bits per pass (3 passes)", .run = Radix(11).run },
-        .{ .name = "threads8", .what = "256 buckets by top byte, then radix8 per bucket on 8 threads", .run = Threads(8).run },
-        .{ .name = "threads16", .what = "256 buckets by top byte, then radix8 per bucket on 16 threads", .run = Threads(16).run },
+        .{ .name = "threads8", .what = "256 buckets by top byte, then radix8 per bucket on 8 threads", .run = Threads(8).run, .threads = true },
+        .{ .name = "threads16", .what = "256 buckets by top byte, then radix8 per bucket on 16 threads", .run = Threads(16).run, .threads = true },
     },
 };
 

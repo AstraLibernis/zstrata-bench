@@ -1,0 +1,39 @@
+job	title	n	unit	threads	variant	items_per_s	x_reference	next	next_items_per_s	what
+D1	add up a column	10000	values	one	lanes16x4	3.5773e10	15.40	lanes16x8	3.5757e10	16 at a time into 4 independent running sums
+D1	add up a column	1000000	values	one	lanes16x4	3.4609e10	15.05	lanes16x8	3.4660e10	16 at a time into 4 independent running sums
+D1	add up a column	1000000	values	all	threads14	2.1723e11	94.47	threads16	2.2500e11	lanes16x4 on 14 threads
+D1	add up a column	100000000	values	one	lanes8	1.6281e10	7.08	lanes16x8	1.6797e10	8 values at a time
+D1	add up a column	100000000	values	all	threads8	1.7733e10	7.71	threads16	1.7771e10	lanes16x4 on 8 threads
+D2	filter rows, about half pass	10000	rows	one	branch	5.9847e9	1.00	mask16	5.2590e9	test each value, copy it if it passes
+D2	filter rows, about half pass	1000000	rows	one	branchfree	4.6598e9	14.50	mask16	1.7565e9	always copy, advance only on a pass
+D2	filter rows, about half pass	1000000	rows	all	threads16	2.1333e10	66.36	threads8	1.3647e10	mask16 on 16 threads, output left in per-block runs
+D2	filter rows, about half pass	100000000	rows	one	branchfree	4.4178e9	14.03	mask16	1.7158e9	always copy, advance only on a pass
+D2	filter rows, about half pass	100000000	rows	all	threads8	8.8526e9	28.11	threads16	8.8994e9	mask16 on 8 threads, output left in per-block runs
+D2s	filter rows, about 1 in 100 pass	10000	rows	one	mask16	4.2811e10	7.05	branch	6.0685e9	compare 16 at a time, copy the set bits
+D2s	filter rows, about 1 in 100 pass	1000000	rows	one	mask16	3.8212e10	7.43	branch	5.1462e9	compare 16 at a time, copy the set bits
+D2s	filter rows, about 1 in 100 pass	1000000	rows	all	threads8	1.4664e11	28.49	threads16	1.9956e11	mask16 on 8 threads, output left in per-block runs
+D2s	filter rows, about 1 in 100 pass	100000000	rows	one	mask16	9.4103e9	2.05	branchfree	4.7961e9	compare 16 at a time, copy the set bits
+D2s	filter rows, about 1 in 100 pass	100000000	rows	all	threads8	1.7182e10	3.74	threads16	1.7182e10	mask16 on 8 threads, output left in per-block runs
+D3	sort a column of 32-bit keys	10000	keys	one	radix11	5.0751e8	19.11	radix8	4.4031e8	radix sort, 11 bits per pass (3 passes)
+D3	sort a column of 32-bit keys	10000	keys	all	threads16	7.0175e8	26.42	threads8	5.7891e8	256 buckets by top byte, then radix8 per bucket on 16 threads
+D3	sort a column of 32-bit keys	1000000	keys	one	radix11	5.2518e8	32.75	radix8	4.3294e8	radix sort, 11 bits per pass (3 passes)
+D3	sort a column of 32-bit keys	1000000	keys	all	threads8	1.1949e9	74.51	threads16	1.2285e9	256 buckets by top byte, then radix8 per bucket on 8 threads
+D3	sort a column of 32-bit keys	10000000	keys	one	radix8	4.0755e8	31.41	radix11	3.8820e8	radix sort, 8 bits per pass (4 passes)
+D3	sort a column of 32-bit keys	10000000	keys	all	threads16	1.2384e9	95.45	threads8	1.0090e9	256 buckets by top byte, then radix8 per bucket on 16 threads
+D4	group by key and total, 1,000 groups	10000	rows	one	table	1.0152e9	1.95	std	5.1932e8	hand-written table giving dense group numbers, totals in an array
+D4	group by key and total, 1,000 groups	1000000	rows	one	sort	3.2273e8	1.62	table	2.0280e8	radix sort the rows by key, then total each run
+D4	group by key and total, 1,000 groups	1000000	rows	all	threads16	1.9207e9	9.67	threads8	1.2907e9	16 parts, each with its own table, on 16 threads; merged in order
+D4	group by key and total, 1,000 groups	20000000	rows	one	sort	2.6150e8	1.28	table	2.0707e8	radix sort the rows by key, then total each run
+D4	group by key and total, 1,000 groups	20000000	rows	all	threads16	2.5111e9	12.27	threads8	1.4840e9	16 parts, each with its own table, on 16 threads; merged in order
+D4m	group by key and total, 100,000 groups	10000	rows	one	table	6.6423e8	2.19	std	3.0380e8	hand-written table giving dense group numbers, totals in an array
+D4m	group by key and total, 100,000 groups	1000000	rows	one	sort	2.4211e8	2.24	table	1.8225e8	radix sort the rows by key, then total each run
+D4m	group by key and total, 100,000 groups	20000000	rows	one	sort	2.3849e8	2.11	table	1.8712e8	radix sort the rows by key, then total each run
+D4m	group by key and total, 100,000 groups	20000000	rows	all	threads16	7.6687e8	6.78	threads8	5.5079e8	16 parts, each with its own table, on 16 threads; merged in order
+D4h	group by key and total, one group per four rows	10000	rows	one	table	8.6317e8	1.96	std	4.4031e8	hand-written table giving dense group numbers, totals in an array
+D4h	group by key and total, one group per four rows	1000000	rows	one	sort	2.0947e8	1.79	table	1.2678e8	radix sort the rows by key, then total each run
+D4h	group by key and total, one group per four rows	20000000	rows	one	sort	1.6558e8	2.37	table	8.2053e7	radix sort the rows by key, then total each run
+D5	join a large table to one a tenth its size	10000	rows	one	table	1.1073e9	1.71	std	6.4579e8	hand-written table on the small table
+D5	join a large table to one a tenth its size	1000000	rows	one	sortmerge	1.9821e8	2.90	table	9.6316e7	radix sort both sides by key, then walk them together
+D5	join a large table to one a tenth its size	1000000	rows	all	threads16	8.1606e8	11.94	threads8	5.7917e8	table built on one thread, looked up on 16
+D5	join a large table to one a tenth its size	20000000	rows	one	sortmerge	1.4662e8	1.96	std	7.4931e7	radix sort both sides by key, then walk them together
+D5	join a large table to one a tenth its size	20000000	rows	all	threads16	6.1906e8	8.26	threads8	3.7975e8	table built on one thread, looked up on 16

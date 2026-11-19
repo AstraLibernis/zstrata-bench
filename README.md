@@ -11,7 +11,8 @@ this way or that way?" is looked up instead of guessed.
 - How to work on it and add a job: [`docs/GUIDE.md`](docs/GUIDE.md)
 - Numbers and what they mean: [`docs/measurements.md`](docs/measurements.md)
 
-Status: the harness and the data-processing jobs D1 to D5 (sum, filter, sort, group, join) are measured.
+Status: the harness, the data-processing jobs D1 to D5 (sum, filter, sort, group, join) and the
+lookup are done.
 
 ```sh
 zig build test                                             # every variant against its reference
@@ -20,6 +21,8 @@ zig-out/bin/zstrata-bench list                             # jobs and what each 
 zig-out/bin/zstrata-bench run D1 --quick                   # seconds: checks the path
 zig-out/bin/zstrata-bench run D1                           # measure; each result is saved as it finishes
 zig-out/bin/zstrata-bench check                            # what is saved, stale or missing
+zig-out/bin/zstrata-bench look group total --rows 1e7      # the measured answer for a job
+zig-out/bin/zstrata-bench map                              # all answers to map/<machine>.tsv
 ```
 
 Needs Zig 0.17.x. zstrata is fetched as a package by the build; its thread pool is

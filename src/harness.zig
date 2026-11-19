@@ -45,6 +45,9 @@ pub const Variant = struct {
     /// The one choice this variant changes, in plain words.
     what: []const u8,
     run: *const fn (env: *Env, input: *anyopaque) anyerror!f64,
+    /// True when the variant uses more than one thread; the map answers "one thread" and
+    /// "all threads" separately.
+    threads: bool = false,
 };
 
 pub const Job = struct {

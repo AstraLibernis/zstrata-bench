@@ -6,6 +6,10 @@ Every number here comes from the files under `results/` and is tagged:
 Machine `znver5-16t-windows`: Ryzen 7 9800X3D (8 cores, 16 threads, AVX-512), Windows 11,
 Zig 0.17.1, ReleaseFast, native CPU target.
 
+The tables below were written from one full run. Results are re-measured whenever code changes,
+so the files under `results/` and the output of `look` can differ from these tables by about
+the spread. `look` and `map/` are the live answers; this page explains them.
+
 How to read a row: the time is the median of the timed runs for one call of the variant; the rate
 is items per second; spread is (third quartile - first quartile) / median.
 

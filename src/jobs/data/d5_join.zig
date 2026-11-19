@@ -228,8 +228,8 @@ pub const job: harness.Job = .{
         .{ .name = "std", .what = "std.AutoHashMap on the small table", .run = stdMap },
         .{ .name = "table", .what = "hand-written table on the small table", .run = table },
         .{ .name = "sortmerge", .what = "radix sort both sides by key, then walk them together", .run = sortMerge },
-        .{ .name = "threads8", .what = "table built on one thread, looked up on 8", .run = Threads(8).run },
-        .{ .name = "threads16", .what = "table built on one thread, looked up on 16", .run = Threads(16).run },
+        .{ .name = "threads8", .what = "table built on one thread, looked up on 8", .run = Threads(8).run, .threads = true },
+        .{ .name = "threads16", .what = "table built on one thread, looked up on 16", .run = Threads(16).run, .threads = true },
     },
 };
 

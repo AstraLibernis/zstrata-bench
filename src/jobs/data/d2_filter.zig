@@ -178,8 +178,8 @@ fn Filter(comptime id: []const u8, comptime title: []const u8, comptime threshol
                 .{ .name = "branch", .what = "test each value, copy it if it passes", .run = Serial(branch).run },
                 .{ .name = "branchfree", .what = "always copy, advance only on a pass", .run = Serial(branchFree).run },
                 .{ .name = "mask16", .what = "compare 16 at a time, copy the set bits", .run = Serial(maskBits).run },
-                .{ .name = "threads8", .what = "mask16 on 8 threads, output left in per-block runs", .run = Threads(8).run },
-                .{ .name = "threads16", .what = "mask16 on 16 threads, output left in per-block runs", .run = Threads(16).run },
+                .{ .name = "threads8", .what = "mask16 on 8 threads, output left in per-block runs", .run = Threads(8).run, .threads = true },
+                .{ .name = "threads16", .what = "mask16 on 16 threads, output left in per-block runs", .run = Threads(16).run, .threads = true },
             },
         };
     };

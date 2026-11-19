@@ -226,8 +226,8 @@ fn Group(comptime id: []const u8, comptime title: []const u8, comptime how: How,
             .{ .name = "sort", .what = "radix sort the rows by key, then total each run", .run = sortThenScan },
         };
         const with_threads = base ++ [_]harness.Variant{
-            .{ .name = "threads8", .what = "16 parts, each with its own table, on 8 threads; merged in order", .run = Threads(8).run },
-            .{ .name = "threads16", .what = "16 parts, each with its own table, on 16 threads; merged in order", .run = Threads(16).run },
+            .{ .name = "threads8", .what = "16 parts, each with its own table, on 8 threads; merged in order", .run = Threads(8).run, .threads = true },
+            .{ .name = "threads16", .what = "16 parts, each with its own table, on 16 threads; merged in order", .run = Threads(16).run, .threads = true },
         };
 
         pub const job: harness.Job = .{

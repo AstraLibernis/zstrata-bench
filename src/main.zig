@@ -7,6 +7,7 @@
 const std = @import("std");
 const harness = @import("harness.zig");
 const jobs = @import("jobs.zig");
+const map = @import("map.zig");
 const Job = harness.Job;
 const Env = harness.Env;
 
@@ -18,6 +19,11 @@ const usage =
     \\        and skipped next time unless its code, the Zig version or the machine changed.
     \\        --quick   tiny sizes, one timed run, nothing saved: checks the path in seconds
     \\        --force   measure again even if a current result is saved
+    \\  look [words...] [--rows N]
+    \\        the measured answer: which variant to use on one thread and with all threads,
+    \\        for every job whose id, title or group contains all the words. --rows picks
+    \\        the measured size nearest N. Example: look group total --rows 1e7
+    \\  map               write every answer to map/<machine>.tsv
     \\  list              jobs, variants and what each variant changes
     \\  check             which measurements are saved, stale or missing
     \\  answer <job> <n>  the reference answer for n items (for the outside checks in verify/)
@@ -68,6 +74,39 @@ fn command(gpa: std.mem.Allocator, io: std.Io, argv: []const [:0]const u8, out: 
         return 0;
     }
     if (std.mem.eql(u8, cmd, "check")) return check(gpa, io, machine, out);
+    if (std.mem.eql(u8, cmd, "map")) {
+        const path = try gpa.print("map/{s}.tsv", .{machine});
+        defer gpa.free(path);
+        var text: std.Io.Writer.Allocating = .init(gpa);
+        defer text.deinit();
+        const rows = try map.writeMap(gpa, io, machine, &jobs.all, &text.writer);
+        try std.Io.Dir.cwd().createDirPath(io, "map");
+        try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = text.written() });
+        try out.print("wrote {s} ({d} answers)\n", .{ path, rows });
+        return 0;
+    }
+    if (std.mem.eql(u8, cmd, "look")) {
+        var words: [16][]const u8 = undefined;
+        var n_words: usize = 0;
+        var rows: ?usize = null;
+        var i: usize = 2;
+        while (i < argv.len) : (i += 1) {
+            if (std.mem.eql(u8, argv[i], "--rows") and i + 1 < argv.len) {
+                i += 1;
+                rows = try parseSize(argv[i]);
+            } else if (n_words < words.len) {
+                words[n_words] = argv[i];
+                n_words += 1;
+            }
+        }
+        try out.print("machine: {s}\n\n", .{machine});
+        const found = try map.look(gpa, io, machine, &jobs.all, words[0..n_words], rows, out);
+        if (found == 0) {
+            try out.writeAll("no job matches those words (see `list`)\n");
+            return 1;
+        }
+        return 0;
+    }
     if (std.mem.eql(u8, cmd, "answer") and argv.len == 4) {
         const job = find(argv[2]) orelse return unknownJob(argv[2]);
         const n = try parseSize(argv[3]);
@@ -227,6 +266,7 @@ test {
     _ = @import("harness.zig");
     _ = @import("data.zig");
     _ = @import("jobs.zig");
+    _ = @import("map.zig");
 }
 
 test "parseSize" {

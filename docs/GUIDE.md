@@ -109,3 +109,33 @@ stated that plainly, the job needs another variant or another size, not a longer
 
 Before ending a session that changed anything: tests pass, results committed and pushed, the
 milestone ticked or a dated note in `docs/notes/` saying exactly where it stopped and what is next.
+
+## Looking an answer up
+
+Before writing code for one of the measured jobs, ask:
+
+```
+zstrata-bench look group total --rows 1e7
+```
+
+The words are matched against each job's id, title and group; every word must be found. `--rows`
+picks the measured size nearest to the one you have. With no words, every job is shown.
+
+For each job and size it prints up to two answers:
+
+- **one thread:** the variant to use when the code must stay on one thread.
+- **all threads:** the variant to use when threads are allowed. If no threaded variant beats the
+  one-thread pick, it says so.
+
+Each answer gives the rate, how many times faster it is than the plain way (the job's first
+variant), what the variant does in one line, and the next best.
+
+How the pick is made: the fastest variant, unless a plainer one (listed earlier in the job) is
+within 5% of it, or within the two measurements' spreads added together, whichever is larger.
+A tie goes to the plainer code.
+
+`zstrata-bench map` writes the same answers for every job and size to `map/<machine>.tsv`.
+
+Limits to keep in mind: an answer holds for the measured sizes and the stated input (for example
+"about half the rows pass"), on the machine named at the top. Between two measured sizes the
+answer can change; when it matters, measure that size with `run <job> --size N`.

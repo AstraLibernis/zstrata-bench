@@ -138,9 +138,9 @@ pub const job: harness.Job = .{
         .{ .name = "lanes16", .what = "16 values at a time", .run = Vectors(16, 1).run },
         .{ .name = "lanes16x4", .what = "16 at a time into 4 independent running sums", .run = Vectors(16, 4).run },
         .{ .name = "lanes16x8", .what = "16 at a time into 8 independent running sums", .run = Vectors(16, 8).run },
-        .{ .name = "threads8", .what = "lanes16x4 on 8 threads", .run = Threads(8).run },
-        .{ .name = "threads14", .what = "lanes16x4 on 14 threads", .run = Threads(14).run },
-        .{ .name = "threads16", .what = "lanes16x4 on 16 threads", .run = Threads(16).run },
+        .{ .name = "threads8", .what = "lanes16x4 on 8 threads", .run = Threads(8).run, .threads = true },
+        .{ .name = "threads14", .what = "lanes16x4 on 14 threads", .run = Threads(14).run, .threads = true },
+        .{ .name = "threads16", .what = "lanes16x4 on 16 threads", .run = Threads(16).run, .threads = true },
     },
 };
 
