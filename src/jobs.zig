@@ -6,6 +6,7 @@
 const harness = @import("harness.zig");
 const d2 = @import("jobs/data/d2_filter.zig");
 const d4 = @import("jobs/data/d4_group.zig");
+const d7 = @import("jobs/data/d7_distinct.zig");
 
 pub const all = [_]*const harness.Job{
     &@import("jobs/data/d1_sum.zig").job,
@@ -16,6 +17,9 @@ pub const all = [_]*const harness.Job{
     &d4.many,
     &d4.huge,
     &@import("jobs/data/d5_join.zig").job,
+    &@import("jobs/data/d6_split.zig").job,
+    &d7.few,
+    &d7.unique,
     &@import("jobs/science/s1_stats.zig").job,
     &@import("jobs/science/s2_histogram.zig").job,
     &@import("jobs/science/s3_quantiles.zig").job,
@@ -36,6 +40,8 @@ test {
     _ = @import("jobs/data/d3_sort.zig");
     _ = d4;
     _ = @import("jobs/data/d5_join.zig");
+    _ = @import("jobs/data/d6_split.zig");
+    _ = d7;
     _ = @import("jobs/science/s1_stats.zig");
     _ = @import("jobs/science/s2_histogram.zig");
     _ = @import("jobs/science/s3_quantiles.zig");

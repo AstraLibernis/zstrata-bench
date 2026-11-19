@@ -487,3 +487,61 @@ What to do:
 
 Not measured: a GPU variant of the weight update (M5), and the shaders are first versions (no
 tuning of workgroup size or shared memory), so the GPU numbers are a floor, not a ceiling.
+
+## D6: split delimited text (2026-11-19)
+
+Find every comma and newline in comma-separated numbers (about one byte in six is a delimiter).
+Billions of bytes per second.
+
+| Variant | 10 KB | 1 MB | 100 MB |
+|---|---|---|---|
+| test each byte, record if a delimiter | 4.8 | 0.95 | 0.93 |
+| always record, move on only for a delimiter | 2.5 | 2.5 | 2.5 |
+| std.mem.findAnyPos for each next delimiter | 3.8 | 0.86 | 0.86 |
+| compare 64 bytes at a time, record the set bits | 13.9 | 8.0 | 6.8 |
+| the same on 16 threads | 13.8 | 86 | 46 |
+
+[MEASURED, `run D6`; spread under 4% on one thread except std at 10 KB (15%), up to 14% threaded.]
+
+- **Compare 64 bytes at once: 7x to 8x** over the byte loop from 1 MB up. Each compare yields a
+  64-bit mask, and only the set bits are visited. [MEASURED]
+- **std's search is the slowest way here** (0.86), slightly behind the plain byte loop: it is
+  called once per delimiter and delimiters are only a few bytes apart. [MEASURED; the reason is
+  DERIVED]
+- The branch-free loop is steady at 2.5 and 2.7x over the branch. At 10 KB the branch looks fast
+  (4.8) for the same reason as in D2: the processor learns the short repeating input.
+- Threads: 11x at 1 MB, 6.7x at 100 MB.
+
+## D7: remove duplicate keys (2026-11-19)
+
+Two jobs: D7 has 1,000 different keys, D7u has one different key per two rows. Millions of rows
+per second at 20 million rows.
+
+| Variant | D7: 1,000 different keys | D7u: 10 million different keys |
+|---|---|---|
+| std.AutoHashMap as a set | 203 | 78 |
+| hand-written table | 217 | 85 |
+| radix sort a copy, keep each new key | 358 | 177 |
+| 16 parts with a table each, 16 threads | 2,544 | 72 |
+
+[MEASURED, `run D7`, `run D7u`; spread under 2% on one thread; the D7 threaded row varies by up
+to 34%.]
+
+- **On one thread, sort then scan again beats hashing**, 1.6x to 2.3x, as in D4 and D5. [MEASURED]
+- **Threads help only when keys repeat a lot.** With 1,000 different keys, per-part tables are
+  12x faster than one thread. With 10 million different keys the same variant is slower than one
+  thread: almost every key survives its part, so the merge on one thread does the whole job
+  again. [MEASURED; the reason is DERIVED]
+
+## What the whole set says, in one place
+
+1. Write vectors out for floating-point loops; the compiler left them scalar in every case
+   measured (S1, S4, S5, S6, M4, M5, M6): 6x to 13x.
+2. Do not branch on data that is a coin flip (D2, D6); write the step so it always runs.
+3. Prefer passes that read memory in order to tables that jump around: sort then scan beat
+   hashing on one thread for grouping, joining and removing duplicates (D4, D5, D7).
+4. Threads pay when each thread's data fits its cache, or when the work per byte is large; they
+   do not pay when one pass over memory is the whole job, or when a one-thread merge follows.
+5. The graphics card wins large jobs when the data lives on it, and loses when little work is
+   done per byte moved (see the GPU section).
+6. Tricks carried over from elsewhere need measuring here: two of them made things slower.

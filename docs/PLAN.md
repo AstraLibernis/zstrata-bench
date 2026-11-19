@@ -1,6 +1,6 @@
 # zstrata-bench plan
 
-Status: **B0 to B5 done** (2026-11-19): harness, the map and `look`, 20 jobs on the CPU (data D1 to D5, data science S1 to S6, model learning M1 to M6), and GPU variants for S5, S6, M3, M4 and M6. Next: B6 (remaining data jobs D6, D7).
+Status: **B0 to B6 done** (2026-11-19): harness, the map and `look`, 22 jobs on the CPU (data D1 to D7, data science S1 to S6, model learning M1 to M6), and GPU variants for S5, S6, M3, M4 and M6. Next: B7 (LLM and zmural slices, when that work is live) and B8 (using it).
 
 ## What this is
 
@@ -146,7 +146,7 @@ Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` tick
 - **B4 Model learning ✓ (2026-11-19).** Bring M3, M4, M6 over from zstrata; add M1, M2, M5.
 - **B5 GPU variants ✓ (2026-11-19, without M5 and without the best-practice checks in tests: see docs/measurements.md).** Add the device choice to the jobs where it can win (S5, S6, M3 to M6), with
   and without transfer cost, and the best-practices layer on in tests.
-- **B6 Remaining data jobs.** D6, D7.
+- **B6 Remaining data jobs ✓ (2026-11-19).** D6, D7.
 - **B7 LLM and zmural slices.** Only when that work is live.
 - **B8 Use it.** Add the lookup to the Zig working habit (the zcanon skill text), and apply
   results to a project when that project is next worked on. Both touch other repos: ask first.

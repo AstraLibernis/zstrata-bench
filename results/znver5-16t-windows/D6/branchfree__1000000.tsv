@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+D6	branchfree	1000000	395733.333	394466.667	0.0024	31	2.5270e9	1681422	4d9fce1c88e5632d	0.17.1

@@ -11,7 +11,7 @@ this way or that way?" is looked up instead of guessed.
 - How to work on it and add a job: [`docs/GUIDE.md`](docs/GUIDE.md)
 - Numbers and what they mean: [`docs/measurements.md`](docs/measurements.md)
 
-Status: the harness, 20 jobs (data processing D1 to D5, data science S1 to S6, model learning
+Status: the harness, 22 jobs (data processing D1 to D7, data science S1 to S6, model learning
 M1 to M6, five of them also on the graphics card) and the
 lookup are done.
 

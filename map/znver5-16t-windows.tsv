@@ -37,6 +37,19 @@ D5	join a large table to one a tenth its size	1000000	rows	one	sortmerge	2.0353e
 D5	join a large table to one a tenth its size	1000000	rows	all	threads16	7.9930e8	11.18	threads8	5.6275e8	table built on one thread, looked up on 16
 D5	join a large table to one a tenth its size	20000000	rows	one	sortmerge	1.5020e8	1.95	std	7.6984e7	radix sort both sides by key, then walk them together
 D5	join a large table to one a tenth its size	20000000	rows	all	threads16	6.0528e8	7.86	threads8	3.7006e8	table built on one thread, looked up on 16
+D6	split delimited text: find every comma and newline	10000	bytes	one	mask64	1.3854e10	2.87	branch	4.8238e9	compare 64 bytes at a time, record the set bits
+D6	split delimited text: find every comma and newline	1000000	bytes	one	mask64	7.9856e9	8.44	branchfree	2.5270e9	compare 64 bytes at a time, record the set bits
+D6	split delimited text: find every comma and newline	1000000	bytes	all	threads16	8.5929e10	90.81	threads8	5.5327e10	mask64 on 16 threads, positions left in per-block runs
+D6	split delimited text: find every comma and newline	100000000	bytes	one	mask64	6.8400e9	7.36	branchfree	2.5281e9	compare 64 bytes at a time, record the set bits
+D6	split delimited text: find every comma and newline	100000000	bytes	all	threads8	4.0718e10	43.80	threads16	4.6066e10	mask64 on 8 threads, positions left in per-block runs
+D7	remove duplicate keys, 1,000 different keys	10000	rows	one	table	1.2947e9	2.47	std	5.2445e8	hand-written table; its key list is the answer
+D7	remove duplicate keys, 1,000 different keys	1000000	rows	one	sort	3.8510e8	1.90	table	2.1941e8	radix sort a copy, keep each key that differs from the one before
+D7	remove duplicate keys, 1,000 different keys	1000000	rows	all	threads16	2.0582e9	10.14	threads8	1.2824e9	16 parts with a table each, on 16 threads; merged in order
+D7	remove duplicate keys, 1,000 different keys	20000000	rows	one	sort	3.5828e8	1.76	table	2.1709e8	radix sort a copy, keep each key that differs from the one before
+D7	remove duplicate keys, 1,000 different keys	20000000	rows	all	threads16	2.5435e9	12.52	threads8	1.6078e9	16 parts with a table each, on 16 threads; merged in order
+D7u	remove duplicate keys, one different key per two rows	10000	rows	one	table	1.0060e9	2.26	std	4.4418e8	hand-written table; its key list is the answer
+D7u	remove duplicate keys, one different key per two rows	1000000	rows	one	sort	1.8867e8	1.93	table	1.2516e8	radix sort a copy, keep each key that differs from the one before
+D7u	remove duplicate keys, one different key per two rows	20000000	rows	one	sort	1.7726e8	2.28	table	8.4528e7	radix sort a copy, keep each key that differs from the one before
 S1	column statistics: mean, variance, min, max	10000	values	one	lanes16	9.6582e9	10.12	onepass	9.5458e8	one loop, 16 values at a time
 S1	column statistics: mean, variance, min, max	1000000	values	one	lanes16	9.8834e9	10.36	onepass	9.5429e8	one loop, 16 values at a time
 S1	column statistics: mean, variance, min, max	1000000	values	all	threads16	1.1796e11	123.61	threads8	6.1900e10	lanes16 on 16 threads

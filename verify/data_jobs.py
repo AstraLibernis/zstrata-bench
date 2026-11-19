@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 AstraLibernis
 #
-# Outside checks for the data-processing jobs D2 to D5: NumPy rebuilds the same input, does the
+# Outside checks for the data-processing jobs D2 to D7: NumPy rebuilds the same input, does the
 # job its own way, and the answer is compared with `zstrata-bench answer <job> <n>`.
 # Usage: python verify/data_jobs.py <job> <n> <answer>
 import sys
@@ -49,6 +49,26 @@ def d5(n):
     return float(hit.sum()) + float((values[hit] * payloads[order[at[hit]]]).sum())
 
 
+def d6(n):
+    # No text is built: field k has 1 + mix(k) % 8 digits and is followed by one delimiter, so
+    # the delimiter after field k sits at (sum of lengths up to k) + k.
+    if n == 0:
+        return 0.0
+    fields = np.arange(n, dtype=np.uint64)  # more fields than could ever fit in n bytes
+    lengths = (mix(fields) % np.uint64(8) + np.uint64(1)).astype(np.int64)
+    positions = np.cumsum(lengths) + np.arange(n, dtype=np.int64)
+    positions = positions[positions < n]
+    a = float(len(positions))
+    if len(positions):
+        a += float(positions[0]) + float(positions[len(positions) // 2]) + float(positions[-1])
+    return a
+
+
+def d7(n, distinct):
+    different = np.unique(keys(n, 8, distinct))
+    return float(len(different)) + float((different % np.uint64(1009) + np.uint64(1)).sum())
+
+
 job, n, theirs = sys.argv[1], int(float(sys.argv[2])), float(sys.argv[3])
 jobs = {
     "D2": (lambda: d2(n, 0.5), 1e-12),
@@ -58,6 +78,9 @@ jobs = {
     "D4m": (lambda: d4(n, max(1, min(100_000, n))), 1e-9),
     "D4h": (lambda: d4(n, max(1, n // 4)), 1e-9),
     "D5": (lambda: d5(n), 1e-9),
+    "D6": (lambda: d6(n), 0.0),
+    "D7": (lambda: d7(n, max(1, min(1000, n))), 0.0),
+    "D7u": (lambda: d7(n, max(1, n // 2)), 0.0),
 }
 run, tolerance = jobs[job]
 sys.exit(0 if report(f"{job} n={n}", run(), theirs, tolerance) else 1)
