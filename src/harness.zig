@@ -147,12 +147,14 @@ pub fn machineId(gpa: std.mem.Allocator) ![]u8 {
     return gpa.print("{s}-{d}t-{s}", .{ builtin.cpu.model.name, cpus, @tagName(builtin.os.tag) });
 }
 
-/// Changes whenever a saved result could be out of date: the job's source, this file, the Zig
+/// Changes whenever a saved result could be out of date: the job's source, this file, the input
+/// generators, the Zig
 /// version or the machine. 16 hex digits.
 pub fn stamp(job: *const Job, machine: []const u8) [16]u8 {
     var h = std.hash.Wyhash.init(0);
     h.update(job.source);
     h.update(@embedFile("harness.zig"));
+    h.update(@embedFile("data.zig"));
     h.update(builtin.zig_version_string);
     h.update(machine);
     var value = h.final();

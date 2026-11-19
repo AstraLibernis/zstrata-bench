@@ -5,7 +5,7 @@
         // zstrata is used as a library (its thread pool). To build against a local checkout
         // instead, replace url and hash with: .path = "../zstrata"
         .zstrata = .{
-            .url = "git+https://github.com/AstraLibernis/zstrata#0e5ecf438ee11081ba65ab07c52c957ad79acea4",
+            .url = "git+https://github.com/AstraLibernis/zstrata#61eb42f85aa04e459b3c8f76f76ca26c1b8978b7",
             .hash = "zstrata-0.0.0-1cYpdXPAAwDJN3i26RtbuCA0iv3hXrsUf49R3ohScBO-",
         },
     },

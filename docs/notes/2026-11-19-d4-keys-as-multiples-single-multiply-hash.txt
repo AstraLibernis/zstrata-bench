@@ -1,0 +1,15 @@
+D4         10000 std               0.0195 ms    5.141e8 rows/s    4.11 GB/s  spread   0.4%  31 runs  
+D4         10000 table             0.3786 ms    2.642e7 rows/s    0.21 GB/s  spread   0.2%  31 runs  
+D4         10000 sort              0.0370 ms    2.706e8 rows/s    2.16 GB/s  spread   0.4%  31 runs  
+D4         10000 threads8          0.3179 ms    3.146e7 rows/s    0.25 GB/s  spread   6.0%  31 runs  
+D4         10000 threads16         0.3373 ms    2.965e7 rows/s    0.24 GB/s  spread   8.8%  31 runs  
+D4       1000000 std               5.5172 ms    1.813e8 rows/s    1.45 GB/s  spread   0.3%  31 runs  
+D4       1000000 table            48.9069 ms    2.045e7 rows/s    0.16 GB/s  spread   0.3%   7 runs  
+D4       1000000 sort              3.1065 ms    3.219e8 rows/s    2.58 GB/s  spread   0.4%  31 runs  
+D4       1000000 threads8          7.0642 ms    1.416e8 rows/s    1.13 GB/s  spread  14.7%  31 runs  
+D4       1000000 threads16         5.2008 ms    1.923e8 rows/s    1.54 GB/s  spread   7.7%  31 runs  
+D4      20000000 std             107.7667 ms    1.856e8 rows/s    1.48 GB/s  spread   0.2%   5 runs  
+D4      20000000 table           982.9380 ms    2.035e7 rows/s    0.16 GB/s  spread   0.2%   5 runs  
+D4      20000000 sort             76.0785 ms    2.629e8 rows/s    2.10 GB/s  spread   0.3%   5 runs  
+D4      20000000 threads8        169.3063 ms    1.181e8 rows/s    0.95 GB/s  spread   0.5%   5 runs  
+D4      20000000 threads16        88.7959 ms    2.252e8 rows/s    1.80 GB/s  spread   2.0%   5 runs  

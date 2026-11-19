@@ -11,7 +11,7 @@ this way or that way?" is looked up instead of guessed.
 - How to work on it and add a job: [`docs/GUIDE.md`](docs/GUIDE.md)
 - Numbers and what they mean: [`docs/measurements.md`](docs/measurements.md)
 
-Status: the harness and the first job (D1, add up a column) are done.
+Status: the harness and the data-processing jobs D1 to D5 (sum, filter, sort, group, join) are measured.
 
 ```sh
 zig build test                                             # every variant against its reference

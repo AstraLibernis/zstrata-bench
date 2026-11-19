@@ -1,6 +1,6 @@
 # zstrata-bench plan
 
-Status: **B0 done** (2026-11-19): harness, saved results, quick mode and job D1. Next: B1. Read `GUIDE.md` for how to work on it.
+Status: **B0 and B1 done** (2026-11-19): harness, and the data jobs D1 to D5 measured. Next: B2 (the map and `look`).
 
 ## What this is
 
@@ -139,7 +139,7 @@ Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` tick
   cost, GPU name, VRAM, shared-memory limit, round-trip cost, transfer speed. Small, but it is a
   change to zstrata, so it waits for the owner's go-ahead. Until then B0 reads the few facts it
   needs from zstrata's existing CSV.
-- **B1 Data processing.** D2 to D5. First real crossovers.
+- **B1 Data processing ✓ (2026-11-19).** D2 to D5. First real crossovers.
 - **B2 The map and `look`.** Distil results into one recommendation file per machine and a lookup
   command. Write the short "how to read an answer" page.
 - **B3 Data science.** S1 to S4, then S5 and S6 on CPU.

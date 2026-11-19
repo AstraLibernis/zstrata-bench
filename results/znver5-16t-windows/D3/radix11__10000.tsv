@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+D3	radix11	10000	19672.549	19598.039	0.0026	31	5.0832e8	7871183313	cc22b6b92fa6161c	0.17.1
