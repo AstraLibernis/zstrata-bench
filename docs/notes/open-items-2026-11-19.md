@@ -19,7 +19,7 @@ real projects".
 3. **The 14 jobs listed in the cross-check note** (lopsided histograms, row-subset histograms,
    `exp`, quoted CSV text, text to number, string grouping, 64-bit float sorts, and the rest)
    are not written.
-4. **This repo's zstrata dependency is pinned to an older commit** (61eb42f). The library
+4. ~~This repo's zstrata dependency was pinned to an older commit.~~ Done: pinned to zstrata 0.1.0 (975c365). The library
    module, `Pool.chunkFor` and the guarded multiply-add arrived later (zstrata 03c4dd4).
 
 ## Not done in zarbor
@@ -48,3 +48,15 @@ real projects".
 12. **The `zig-0.17.1` tag** still points at the first public commit, not at the library commit.
 13. **Profile export** (one file another project can read at build time) was discussed and not
     built.
+
+## Versions at the end of 2026-11-19
+
+| Project | Version | Tag | What it holds |
+|---|---|---|---|
+| zstrata | 0.1.0 | `v0.1.0` | the hardware map plus the library (`Pool`, `simd`, `sort`) |
+| zstrata-bench | 0.1.0 | `v0.1.0` | 25 jobs, 486 measurements, built against zstrata 0.1.0 |
+| zarbor | 0.6.1 | `v0.6.1` | one-compare tree walk, two-pass split scan |
+| zscour | 0.1.1 | `v0.1.1` | sorts from zstrata 0.1.0, zarbor 0.6.1 |
+
+Item 12 (the `zig-0.17.1` tags) is unchanged in all four: moving a pushed tag means replacing
+it on the remote, which is left to the owner.
