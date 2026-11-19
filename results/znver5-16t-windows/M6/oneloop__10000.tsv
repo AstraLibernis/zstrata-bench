@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M6	oneloop	10000	14794.030	14607.463	0.0145	31	6.7595e8	-5.108671738009434	44451683f8aa1643	0.17.1

@@ -35,6 +35,12 @@ pub fn fillMixed(xs: []u32, seed: u32) void {
     for (xs) |*x| x.* = mix(next(&state));
 }
 
+/// Fills `xs` with scrambled bytes (the low 8 bits of each scrambled value).
+pub fn fillBytes(xs: []u8, seed: u32) void {
+    var state = seed;
+    for (xs) |*x| x.* = @truncate(mix(next(&state)));
+}
+
 /// Fills `xs` with keys drawn from `distinct` different values (each key is
 /// `mix(scrambled % distinct)`; `mix` never maps two numbers to one, so there are exactly that
 /// many keys and they have no pattern a hash function could trip over). `distinct` must be at

@@ -1,71 +1,107 @@
 job	title	n	unit	threads	variant	items_per_s	x_reference	next	next_items_per_s	what
-D1	add up a column	10000	values	one	lanes16x4	3.5773e10	15.40	lanes16x8	3.5757e10	16 at a time into 4 independent running sums
-D1	add up a column	1000000	values	one	lanes16x4	3.4609e10	15.05	lanes16x8	3.4660e10	16 at a time into 4 independent running sums
-D1	add up a column	1000000	values	all	threads14	2.1723e11	94.47	threads16	2.2500e11	lanes16x4 on 14 threads
-D1	add up a column	100000000	values	one	lanes8	1.6281e10	7.08	lanes16x8	1.6797e10	8 values at a time
-D1	add up a column	100000000	values	all	threads8	1.7733e10	7.71	threads16	1.7771e10	lanes16x4 on 8 threads
-D2	filter rows, about half pass	10000	rows	one	branch	5.9847e9	1.00	mask16	5.2590e9	test each value, copy it if it passes
-D2	filter rows, about half pass	1000000	rows	one	branchfree	4.6598e9	14.50	mask16	1.7565e9	always copy, advance only on a pass
-D2	filter rows, about half pass	1000000	rows	all	threads16	2.1333e10	66.36	threads8	1.3647e10	mask16 on 16 threads, output left in per-block runs
-D2	filter rows, about half pass	100000000	rows	one	branchfree	4.4178e9	14.03	mask16	1.7158e9	always copy, advance only on a pass
-D2	filter rows, about half pass	100000000	rows	all	threads8	8.8526e9	28.11	threads16	8.8994e9	mask16 on 8 threads, output left in per-block runs
-D2s	filter rows, about 1 in 100 pass	10000	rows	one	mask16	4.2811e10	7.05	branch	6.0685e9	compare 16 at a time, copy the set bits
-D2s	filter rows, about 1 in 100 pass	1000000	rows	one	mask16	3.8212e10	7.43	branch	5.1462e9	compare 16 at a time, copy the set bits
-D2s	filter rows, about 1 in 100 pass	1000000	rows	all	threads8	1.4664e11	28.49	threads16	1.9956e11	mask16 on 8 threads, output left in per-block runs
-D2s	filter rows, about 1 in 100 pass	100000000	rows	one	mask16	9.4103e9	2.05	branchfree	4.7961e9	compare 16 at a time, copy the set bits
-D2s	filter rows, about 1 in 100 pass	100000000	rows	all	threads8	1.7182e10	3.74	threads16	1.7182e10	mask16 on 8 threads, output left in per-block runs
-D3	sort a column of 32-bit keys	10000	keys	one	radix11	5.0751e8	19.11	radix8	4.4031e8	radix sort, 11 bits per pass (3 passes)
-D3	sort a column of 32-bit keys	10000	keys	all	threads16	7.0175e8	26.42	threads8	5.7891e8	256 buckets by top byte, then radix8 per bucket on 16 threads
-D3	sort a column of 32-bit keys	1000000	keys	one	radix11	5.2518e8	32.75	radix8	4.3294e8	radix sort, 11 bits per pass (3 passes)
-D3	sort a column of 32-bit keys	1000000	keys	all	threads8	1.1949e9	74.51	threads16	1.2285e9	256 buckets by top byte, then radix8 per bucket on 8 threads
-D3	sort a column of 32-bit keys	10000000	keys	one	radix8	4.0755e8	31.41	radix11	3.8820e8	radix sort, 8 bits per pass (4 passes)
-D3	sort a column of 32-bit keys	10000000	keys	all	threads16	1.2384e9	95.45	threads8	1.0090e9	256 buckets by top byte, then radix8 per bucket on 16 threads
-D4	group by key and total, 1,000 groups	10000	rows	one	table	1.0152e9	1.95	std	5.1932e8	hand-written table giving dense group numbers, totals in an array
-D4	group by key and total, 1,000 groups	1000000	rows	one	sort	3.2273e8	1.62	table	2.0280e8	radix sort the rows by key, then total each run
-D4	group by key and total, 1,000 groups	1000000	rows	all	threads16	1.9207e9	9.67	threads8	1.2907e9	16 parts, each with its own table, on 16 threads; merged in order
-D4	group by key and total, 1,000 groups	20000000	rows	one	sort	2.6150e8	1.28	table	2.0707e8	radix sort the rows by key, then total each run
-D4	group by key and total, 1,000 groups	20000000	rows	all	threads16	2.5111e9	12.27	threads8	1.4840e9	16 parts, each with its own table, on 16 threads; merged in order
-D4m	group by key and total, 100,000 groups	10000	rows	one	table	6.6423e8	2.19	std	3.0380e8	hand-written table giving dense group numbers, totals in an array
-D4m	group by key and total, 100,000 groups	1000000	rows	one	sort	2.4211e8	2.24	table	1.8225e8	radix sort the rows by key, then total each run
-D4m	group by key and total, 100,000 groups	20000000	rows	one	sort	2.3849e8	2.11	table	1.8712e8	radix sort the rows by key, then total each run
-D4m	group by key and total, 100,000 groups	20000000	rows	all	threads16	7.6687e8	6.78	threads8	5.5079e8	16 parts, each with its own table, on 16 threads; merged in order
-D4h	group by key and total, one group per four rows	10000	rows	one	table	8.6317e8	1.96	std	4.4031e8	hand-written table giving dense group numbers, totals in an array
-D4h	group by key and total, one group per four rows	1000000	rows	one	sort	2.0947e8	1.79	table	1.2678e8	radix sort the rows by key, then total each run
-D4h	group by key and total, one group per four rows	20000000	rows	one	sort	1.6558e8	2.37	table	8.2053e7	radix sort the rows by key, then total each run
-D5	join a large table to one a tenth its size	10000	rows	one	table	1.1073e9	1.71	std	6.4579e8	hand-written table on the small table
-D5	join a large table to one a tenth its size	1000000	rows	one	sortmerge	1.9821e8	2.90	table	9.6316e7	radix sort both sides by key, then walk them together
-D5	join a large table to one a tenth its size	1000000	rows	all	threads16	8.1606e8	11.94	threads8	5.7917e8	table built on one thread, looked up on 16
-D5	join a large table to one a tenth its size	20000000	rows	one	sortmerge	1.4662e8	1.96	std	7.4931e7	radix sort both sides by key, then walk them together
-D5	join a large table to one a tenth its size	20000000	rows	all	threads16	6.1906e8	8.26	threads8	3.7975e8	table built on one thread, looked up on 16
-S1	column statistics: mean, variance, min, max	10000	values	one	lanes16	9.6469e9	10.10	onepass	9.5560e8	one loop, 16 values at a time
-S1	column statistics: mean, variance, min, max	1000000	values	one	lanes16	9.8580e9	10.34	onepass	9.5329e8	one loop, 16 values at a time
-S1	column statistics: mean, variance, min, max	1000000	values	all	threads16	1.1710e11	122.84	threads8	6.4312e10	lanes16 on 16 threads
-S1	column statistics: mean, variance, min, max	100000000	values	one	lanes16	9.2049e9	9.67	onepass	9.5164e8	one loop, 16 values at a time
-S1	column statistics: mean, variance, min, max	100000000	values	all	threads8	1.8006e10	18.92	threads16	1.7857e10	lanes16 on 8 threads
-S2	histogram of a column, 256 bins	10000	values	one	bins16	4.1846e9	1.05	onetable	3.9851e9	16 bin numbers worked out at once, counted into four tables
-S2	histogram of a column, 256 bins	10000	values	all	threads8	5.8286e9	1.46	threads16	5.5556e9	16 parts with their own tables, on 8 threads
-S2	histogram of a column, 256 bins	1000000	values	one	bins16	4.6425e9	1.10	fourtables	4.3122e9	16 bin numbers worked out at once, counted into four tables
-S2	histogram of a column, 256 bins	1000000	values	all	threads16	3.2389e10	7.68	threads8	1.7897e10	16 parts with their own tables, on 16 threads
-S2	histogram of a column, 256 bins	100000000	values	one	bins16	4.5620e9	1.08	fourtables	4.2606e9	16 bin numbers worked out at once, counted into four tables
-S2	histogram of a column, 256 bins	100000000	values	all	threads8	1.6419e10	3.90	threads16	1.6831e10	16 parts with their own tables, on 8 threads
-S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000	values	one	select	5.6593e8	9.14	radix	3.0434e8	partition a copy around each position, no full sort
-S3	quantiles of a column (1, 25, 50, 75, 99 percent)	1000000	values	one	histogram	1.2599e9	36.57	radix	3.0029e8	count the top 16 bits, then sort only the bins that hold a position
-S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000000	values	one	histogram	1.2607e9	38.08	radix	2.8628e8	count the top 16 bits, then sort only the bins that hold a position
-S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000000	values	all	threads8	1.4415e9	43.54	threads16	1.4814e9	histogram with the counting pass on 8 threads
-S4	correlation between 8 columns	10000	rows	one	pieces	5.1247e8	10.57	pairs16	4.6677e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
-S4	correlation between 8 columns	1000000	rows	one	pieces	4.9118e8	10.17	pairs16	4.0960e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
-S4	correlation between 8 columns	1000000	rows	all	threads8	2.6247e9	54.35	threads16	3.6206e9	pairs16 over blocks of rows on 8 threads
-S4	correlation between 8 columns	10000000	rows	one	pieces	4.0418e8	8.39	rowlayout	3.3536e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
-S4	correlation between 8 columns	10000000	rows	all	threads16	1.9748e9	40.98	threads8	1.4898e9	pairs16 over blocks of rows on 16 threads
-S5	nearest neighbour distance for every point, 8 dimensions, all pairs	1000000	pairs	one	points16	8.3179e9	12.82	dims8	8.0064e8	one array per dimension, 16 other points at a time
-S5	nearest neighbour distance for every point, 8 dimensions, all pairs	1000000	pairs	all	threads8	2.1311e10	32.84	threads16	1.2552e10	points16 on 8 threads
-S5	nearest neighbour distance for every point, 8 dimensions, all pairs	16000000	pairs	one	points16	6.8172e9	10.52	dims8	7.9908e8	one array per dimension, 16 other points at a time
-S5	nearest neighbour distance for every point, 8 dimensions, all pairs	16000000	pairs	all	threads8	5.0314e10	77.66	threads16	3.5730e10	points16 on 8 threads
-S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	one	points16	7.7956e9	12.05	dims8	7.9821e8	one array per dimension, 16 other points at a time
-S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	all	threads16	4.4527e10	68.83	threads8	2.7871e10	points16 on 16 threads
-S6	multiply two square matrices	2097152	multiply-adds	one	fused4	3.6255e10	11.06	fused	2.7586e10	fused, four rows of the second matrix per pass
-S6	multiply two square matrices	2097152	multiply-adds	all	threads16	1.4401e11	43.95	threads8	1.1985e11	fused4, result rows shared out over 16 threads
-S6	multiply two square matrices	134217728	multiply-adds	one	fused	4.0273e10	38.98	fused4	4.0509e10	lanes16 with fused multiply-add
-S6	multiply two square matrices	134217728	multiply-adds	all	threads8	2.5151e11	243.45	threads16	2.4220e11	fused4, result rows shared out over 8 threads
-S6	multiply two square matrices	1073741824	multiply-adds	one	fused	4.7406e10	146.10	lanes16	4.1943e10	lanes16 with fused multiply-add
-S6	multiply two square matrices	1073741824	multiply-adds	all	threads16	2.5939e11	799.43	threads8	1.4141e11	fused4, result rows shared out over 16 threads
+D1	add up a column	10000	values	one	lanes16x4	3.5889e10	15.44	lanes16	3.2986e10	16 at a time into 4 independent running sums
+D1	add up a column	1000000	values	one	lanes16x4	3.4788e10	15.13	lanes16x8	3.4247e10	16 at a time into 4 independent running sums
+D1	add up a column	1000000	values	all	threads14	2.1383e11	93.02	threads16	2.2500e11	lanes16x4 on 14 threads
+D1	add up a column	100000000	values	one	lanes16	1.6222e10	7.09	lanes16x8	1.6375e10	16 values at a time
+D1	add up a column	100000000	values	all	threads8	1.7579e10	7.68	threads16	1.7502e10	lanes16x4 on 8 threads
+D2	filter rows, about half pass	10000	rows	one	branch	5.9933e9	1.00	mask16	4.8171e9	test each value, copy it if it passes
+D2	filter rows, about half pass	1000000	rows	one	branchfree	4.6155e9	14.25	mask16	1.8440e9	always copy, advance only on a pass
+D2	filter rows, about half pass	1000000	rows	all	threads16	2.1436e10	66.20	threads8	1.3105e10	mask16 on 16 threads, output left in per-block runs
+D2	filter rows, about half pass	100000000	rows	one	branchfree	4.3891e9	13.92	mask16	1.8033e9	always copy, advance only on a pass
+D2	filter rows, about half pass	100000000	rows	all	threads8	8.8077e9	27.94	threads16	8.8808e9	mask16 on 8 threads, output left in per-block runs
+D2s	filter rows, about 1 in 100 pass	10000	rows	one	mask16	3.7147e10	4.69	branch	7.9234e9	compare 16 at a time, copy the set bits
+D2s	filter rows, about 1 in 100 pass	10000	rows	all	threads8	4.2400e10	5.35	threads16	4.2531e10	mask16 on 8 threads, output left in per-block runs
+D2s	filter rows, about 1 in 100 pass	1000000	rows	one	mask16	3.3807e10	4.35	branch	7.7700e9	compare 16 at a time, copy the set bits
+D2s	filter rows, about 1 in 100 pass	1000000	rows	all	threads8	1.6705e11	21.50	threads16	2.2762e11	mask16 on 8 threads, output left in per-block runs
+D2s	filter rows, about 1 in 100 pass	100000000	rows	one	mask16	9.0075e9	1.82	branch	4.9429e9	compare 16 at a time, copy the set bits
+D2s	filter rows, about 1 in 100 pass	100000000	rows	all	threads8	1.6598e10	3.36	threads16	1.6689e10	mask16 on 8 threads, output left in per-block runs
+D3	sort a column of 32-bit keys	10000	keys	one	radix11	5.0766e8	19.30	radix8	4.3690e8	radix sort, 11 bits per pass (3 passes)
+D3	sort a column of 32-bit keys	10000	keys	all	threads8	6.2732e8	23.84	threads16	7.0485e8	256 buckets by top byte, then radix8 per bucket on 8 threads
+D3	sort a column of 32-bit keys	1000000	keys	one	radix11	5.2436e8	33.59	radix8	4.3208e8	radix sort, 11 bits per pass (3 passes)
+D3	sort a column of 32-bit keys	1000000	keys	all	threads8	1.2200e9	78.14	threads16	1.1861e9	256 buckets by top byte, then radix8 per bucket on 8 threads
+D3	sort a column of 32-bit keys	10000000	keys	one	radix8	4.0850e8	32.24	radix11	3.7970e8	radix sort, 8 bits per pass (4 passes)
+D3	sort a column of 32-bit keys	10000000	keys	all	threads16	1.2312e9	97.17	threads8	1.0061e9	256 buckets by top byte, then radix8 per bucket on 16 threads
+D4	group by key and total, 1,000 groups	10000	rows	one	table	9.4262e8	1.82	std	5.1853e8	hand-written table giving dense group numbers, totals in an array
+D4	group by key and total, 1,000 groups	1000000	rows	one	sort	3.2224e8	1.69	table	1.9906e8	radix sort the rows by key, then total each run
+D4	group by key and total, 1,000 groups	1000000	rows	all	threads16	1.9387e9	10.15	threads8	1.2113e9	16 parts, each with its own table, on 16 threads; merged in order
+D4	group by key and total, 1,000 groups	20000000	rows	one	sort	2.6121e8	1.31	table	2.0470e8	radix sort the rows by key, then total each run
+D4	group by key and total, 1,000 groups	20000000	rows	all	threads16	2.5401e9	12.74	threads8	1.5263e9	16 parts, each with its own table, on 16 threads; merged in order
+D4m	group by key and total, 100,000 groups	10000	rows	one	table	6.6405e8	2.13	std	3.1136e8	hand-written table giving dense group numbers, totals in an array
+D4m	group by key and total, 100,000 groups	1000000	rows	one	sort	2.4036e8	2.26	table	1.7898e8	radix sort the rows by key, then total each run
+D4m	group by key and total, 100,000 groups	20000000	rows	one	sort	2.3514e8	2.13	table	1.8423e8	radix sort the rows by key, then total each run
+D4m	group by key and total, 100,000 groups	20000000	rows	all	threads16	7.7233e8	7.01	threads8	5.6252e8	16 parts, each with its own table, on 16 threads; merged in order
+D4h	group by key and total, one group per four rows	10000	rows	one	table	8.7311e8	1.97	std	4.4259e8	hand-written table giving dense group numbers, totals in an array
+D4h	group by key and total, one group per four rows	1000000	rows	one	sort	2.0486e8	1.80	table	1.2362e8	radix sort the rows by key, then total each run
+D4h	group by key and total, one group per four rows	20000000	rows	one	sort	1.6602e8	2.45	table	8.1765e7	radix sort the rows by key, then total each run
+D5	join a large table to one a tenth its size	10000	rows	one	table	1.1045e9	1.70	std	6.4888e8	hand-written table on the small table
+D5	join a large table to one a tenth its size	1000000	rows	one	sortmerge	1.9955e8	2.89	table	9.3677e7	radix sort both sides by key, then walk them together
+D5	join a large table to one a tenth its size	1000000	rows	all	threads16	8.1274e8	11.78	threads8	5.8096e8	table built on one thread, looked up on 16
+D5	join a large table to one a tenth its size	20000000	rows	one	sortmerge	1.4831e8	1.97	std	7.5251e7	radix sort both sides by key, then walk them together
+D5	join a large table to one a tenth its size	20000000	rows	all	threads16	6.4039e8	8.51	threads8	3.9083e8	table built on one thread, looked up on 16
+S1	column statistics: mean, variance, min, max	10000	values	one	lanes16	9.6628e9	10.12	onepass	9.5510e8	one loop, 16 values at a time
+S1	column statistics: mean, variance, min, max	1000000	values	one	lanes16	9.9325e9	10.41	onepass	9.5447e8	one loop, 16 values at a time
+S1	column statistics: mean, variance, min, max	1000000	values	all	threads16	1.0740e11	112.52	threads8	6.4816e10	lanes16 on 16 threads
+S1	column statistics: mean, variance, min, max	100000000	values	one	lanes16	9.1960e9	9.65	onepass	9.5301e8	one loop, 16 values at a time
+S1	column statistics: mean, variance, min, max	100000000	values	all	threads8	1.7726e10	18.60	threads16	1.7477e10	lanes16 on 8 threads
+S2	histogram of a column, 256 bins	10000	values	one	onetable	4.0146e9	1.00	bins16	3.9596e9	one table, one value at a time
+S2	histogram of a column, 256 bins	10000	values	all	threads8	5.4768e9	1.36	threads16	5.5848e9	16 parts with their own tables, on 8 threads
+S2	histogram of a column, 256 bins	1000000	values	one	bins16	4.5033e9	1.06	fourtables	4.2757e9	16 bin numbers worked out at once, counted into four tables
+S2	histogram of a column, 256 bins	1000000	values	all	threads16	3.2008e10	7.57	threads8	1.9643e10	16 parts with their own tables, on 16 threads
+S2	histogram of a column, 256 bins	100000000	values	one	onetable	4.2120e9	1.00	bins16	4.4065e9	one table, one value at a time
+S2	histogram of a column, 256 bins	100000000	values	all	threads8	1.5919e10	3.78	threads16	1.6894e10	16 parts with their own tables, on 8 threads
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000	values	one	select	5.9137e8	9.47	histogram	4.1854e8	partition a copy around each position, no full sort
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	1000000	values	one	histogram	1.2696e9	37.00	radix	3.0073e8	count the top 16 bits, then sort only the bins that hold a position
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000000	values	one	histogram	1.2126e9	36.79	radix	2.8823e8	count the top 16 bits, then sort only the bins that hold a position
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000000	values	all	threads8	1.3989e9	42.45	threads16	1.4179e9	histogram with the counting pass on 8 threads
+S4	correlation between 8 columns	10000	rows	one	pieces	5.0801e8	10.47	pairs16	4.6194e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
+S4	correlation between 8 columns	1000000	rows	one	pieces	4.8916e8	10.14	pairs16	4.0578e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
+S4	correlation between 8 columns	1000000	rows	all	threads16	3.6267e9	75.17	threads8	2.5124e9	pairs16 over blocks of rows on 16 threads
+S4	correlation between 8 columns	10000000	rows	one	pieces	4.0518e8	8.40	rowlayout	3.3580e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
+S4	correlation between 8 columns	10000000	rows	all	threads16	1.9886e9	41.21	threads8	1.4848e9	pairs16 over blocks of rows on 16 threads
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	1000000	pairs	one	points16	8.3041e9	12.82	dims8	8.0019e8	one array per dimension, 16 other points at a time
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	1000000	pairs	all	threads8	1.9997e10	30.87	threads16	1.2395e10	points16 on 8 threads
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	16000000	pairs	one	points16	6.7471e9	10.41	dims8	7.9908e8	one array per dimension, 16 other points at a time
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	16000000	pairs	all	threads8	3.5297e10	54.45	threads16	3.5060e10	points16 on 8 threads
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	one	points16	7.7866e9	12.03	dims8	7.9791e8	one array per dimension, 16 other points at a time
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	all	threads16	4.4216e10	68.31	threads8	2.5106e10	points16 on 16 threads
+S6	multiply two square matrices	2097152	multiply-adds	one	fused4	3.6213e10	11.54	fused	2.7336e10	fused, four rows of the second matrix per pass
+S6	multiply two square matrices	2097152	multiply-adds	all	threads16	1.4303e11	45.57	threads8	1.3031e11	fused4, result rows shared out over 16 threads
+S6	multiply two square matrices	134217728	multiply-adds	one	fused	4.0709e10	39.54	fused4	4.0110e10	lanes16 with fused multiply-add
+S6	multiply two square matrices	134217728	multiply-adds	all	threads8	2.5052e11	243.34	threads16	2.2728e11	fused4, result rows shared out over 8 threads
+S6	multiply two square matrices	1073741824	multiply-adds	one	fused	4.7066e10	169.83	lanes16	4.3513e10	lanes16 with fused multiply-add
+S6	multiply two square matrices	1073741824	multiply-adds	all	threads16	2.6029e11	939.25	threads8	1.4186e11	fused4, result rows shared out over 16 threads
+M1	tree histogram build: gradients into 256 bins for 8 features	10000	rows	one	sidebyside	3.6739e8	1.68	pieces	3.6330e8	one pass per feature; each bin's two sums side by side
+M1	tree histogram build: gradients into 256 bins for 8 features	10000	rows	all	threads8	5.5319e8	2.53	threads16	5.5556e8	pieces in 16 parts with their own histograms, 8 threads
+M1	tree histogram build: gradients into 256 bins for 8 features	1000000	rows	one	sidebyside	3.6354e8	1.60	pieces	3.6315e8	one pass per feature; each bin's two sums side by side
+M1	tree histogram build: gradients into 256 bins for 8 features	1000000	rows	all	threads8	2.6344e9	11.62	threads16	2.5898e9	pieces in 16 parts with their own histograms, 8 threads
+M1	tree histogram build: gradients into 256 bins for 8 features	10000000	rows	one	sidebyside	3.7016e8	1.62	pieces	3.6978e8	one pass per feature; each bin's two sums side by side
+M1	tree histogram build: gradients into 256 bins for 8 features	10000000	rows	all	threads16	2.9628e9	13.00	threads8	1.5675e9	pieces in 16 parts with their own histograms, 16 threads
+M2	best split scan over 256-bin gradient histograms	100	histograms	one	wide8	4.0890e6	1.40	branch	2.9234e6	running sums first, then all values 8 at a time, then pick
+M2	best split scan over 256-bin gradient histograms	100	histograms	all	threads8	5.8226e6	1.99	threads16	5.6818e6	wide8 over blocks of histograms on 8 threads
+M2	best split scan over 256-bin gradient histograms	10000	histograms	one	wide8	4.0677e6	1.40	branch	2.9125e6	running sums first, then all values 8 at a time, then pick
+M2	best split scan over 256-bin gradient histograms	10000	histograms	all	threads16	3.7034e7	12.72	threads8	2.5389e7	wide8 over blocks of histograms on 16 threads
+M2	best split scan over 256-bin gradient histograms	100000	histograms	one	wide8	4.0563e6	1.39	branch	2.9088e6	running sums first, then all values 8 at a time, then pick
+M2	best split scan over 256-bin gradient histograms	100000	histograms	all	threads8	1.6143e7	5.55	threads16	1.6565e7	wide8 over blocks of histograms on 8 threads
+M3	tree ensemble inference: 100 trees of depth 6 over rows of 8 features	1000	rows	one	branch	2.2450e6	1.00	treefirst	2.2341e6	row by row, tree by tree, an `if` at every test
+M3	tree ensemble inference: 100 trees of depth 6 over rows of 8 features	1000	rows	all	threads8	4.0713e6	1.81	threads16	5.6601e6	treefirst, blocks of rows on 8 threads
+M3	tree ensemble inference: 100 trees of depth 6 over rows of 8 features	100000	rows	one	branch	2.2432e6	1.00	treefirst	2.2237e6	row by row, tree by tree, an `if` at every test
+M3	tree ensemble inference: 100 trees of depth 6 over rows of 8 features	100000	rows	all	threads16	1.4520e7	6.47	threads8	7.8376e6	treefirst, blocks of rows on 16 threads
+M3	tree ensemble inference: 100 trees of depth 6 over rows of 8 features	1000000	rows	one	branch	2.2240e6	1.00	treefirst	2.2249e6	row by row, tree by tree, an `if` at every test
+M3	tree ensemble inference: 100 trees of depth 6 over rows of 8 features	1000000	rows	all	threads16	1.6092e7	7.24	threads8	9.0909e6	treefirst, blocks of rows on 16 threads
+M4	dense layer forward with ReLU, 256 inputs to 256 outputs	64	rows	one	dot16x4	6.7973e5	13.28	dot16	6.2671e5	the dot product as four fused running sums of 16
+M4	dense layer forward with ReLU, 256 inputs to 256 outputs	64	rows	all	threads8	2.6376e6	51.53	threads16	2.7018e6	scaled, rows shared out over 8 threads
+M4	dense layer forward with ReLU, 256 inputs to 256 outputs	4096	rows	one	dot16x4	6.7973e5	13.28	dot16	6.2557e5	the dot product as four fused running sums of 16
+M4	dense layer forward with ReLU, 256 inputs to 256 outputs	4096	rows	all	threads8	3.1250e6	61.04	threads16	3.0399e6	scaled, rows shared out over 8 threads
+M4	dense layer forward with ReLU, 256 inputs to 256 outputs	32768	rows	one	dot16x4	6.5869e5	12.89	dot16	6.0609e5	the dot product as four fused running sums of 16
+M4	dense layer forward with ReLU, 256 inputs to 256 outputs	32768	rows	all	threads16	2.9844e6	58.39	threads8	1.9444e6	scaled, rows shared out over 16 threads
+M5	dense layer weight gradient and update, 256 by 256 weights	64	rows	one	rowbyrow16	4.4273e5	6.03	tiled	4.4121e5	the same order, inner step as fused 16-wide vectors
+M5	dense layer weight gradient and update, 256 by 256 weights	64	rows	all	threads8	1.2563e6	17.12	threads16	1.3978e6	tiled, weight rows shared out over 8 threads
+M5	dense layer weight gradient and update, 256 by 256 weights	1024	rows	one	rowbyrow16	6.2314e5	8.11	tiled	6.1207e5	the same order, inner step as fused 16-wide vectors
+M5	dense layer weight gradient and update, 256 by 256 weights	1024	rows	all	threads8	3.8759e6	50.42	threads16	4.4201e6	tiled, weight rows shared out over 8 threads
+M5	dense layer weight gradient and update, 256 by 256 weights	16384	rows	one	rowbyrow16	6.4558e5	8.38	tiled	6.1046e5	the same order, inner step as fused 16-wide vectors
+M5	dense layer weight gradient and update, 256 by 256 weights	16384	rows	all	threads16	4.8178e6	62.54	threads8	2.7047e6	tiled, weight rows shared out over 16 threads
+M6	one Adam optimiser step over an array of parameters	10000	parameters	one	lanes16	7.2852e9	10.78	oneloop	6.7595e8	one loop, 16 parameters at a time
+M6	one Adam optimiser step over an array of parameters	1000000	parameters	one	lanes16	4.9106e9	7.49	oneloop	6.5557e8	one loop, 16 parameters at a time
+M6	one Adam optimiser step over an array of parameters	1000000	parameters	all	threads8	1.6183e10	24.69	threads16	1.8440e10	lanes16 over blocks on 8 threads
+M6	one Adam optimiser step over an array of parameters	50000000	parameters	one	lanes16	1.4090e9	2.07	oneloop	6.8020e8	one loop, 16 parameters at a time
+M6	one Adam optimiser step over an array of parameters	50000000	parameters	all	threads8	1.5429e9	2.27	threads16	1.5143e9	lanes16 over blocks on 8 threads

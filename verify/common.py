@@ -50,3 +50,8 @@ def report(name, ours, theirs, tolerance):
     ok = abs(ours - theirs) <= tolerance * max(1.0, abs(ours))
     print(f"{name}: NumPy {ours!r}  zstrata-bench {theirs!r}  {'AGREE' if ok else 'DIFFER'}")
     return ok
+
+
+def byte_values(n, seed):
+    """data.fillBytes: the low 8 bits of each scrambled value."""
+    return (mixed(n, seed) & np.uint64(0xFF)).astype(np.int64)

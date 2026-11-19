@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M1	pieces	10000000	27043400.000	27006000.000	0.0023	12	3.6978e8	11560259686.629148	41d533d3eb2e86da	0.17.1

@@ -297,3 +297,143 @@ Square matrices of 32-bit floats. Billions of multiply-adds per second.
 - Lay data out so the long direction is the vector direction (S5), and cut long passes into
   cache-sized pieces when there are many of them (S4).
 - A cheap counting pass can replace a sort when only a few positions are wanted (S3).
+
+## M1: tree histogram build (2026-11-19)
+
+Gradients and hessians of each row added into 256 bins for each of 8 features. Millions of rows
+per second.
+
+| Variant | 10,000 rows | 1,000,000 | 10,000,000 |
+|---|---|---|---|
+| per feature; gradient and hessian sums in separate tables | 219 | 227 | 228 |
+| per feature; each bin's two sums side by side | 367 | 364 | 370 |
+| bins stored row after row, one pass | 337 | 347 | 348 |
+| side by side, rows to two tables in turn | 199 | 204 | 205 |
+| side by side, 4,096 rows at a time | 363 | 363 | 370 |
+| 16 parts with their own histograms, 16 threads | 556 | 2,590 | 2,963 |
+
+[MEASURED, `run M1`; spread under 1% on one thread, up to 19% for the threaded rows shown.]
+
+- **Keep a bin's gradient and hessian sums next to each other: 1.6x.** One cache line is touched
+  per row and feature instead of two. [MEASURED; the cause is DERIVED]
+- **Two tables in turn made it 1.8x slower**, the opposite of what the trick is for. With bins
+  spread evenly, neighbouring rows rarely hit the same bin, and the second table only costs
+  cache. [MEASURED; the cause is DERIVED]
+- Row layout and cache-sized pieces change nothing here (within 6%).
+- Threads: 7x to 8x from a million rows up.
+
+## M2: best split scan (2026-11-19)
+
+Millions of 256-bin histograms scanned per second.
+
+| Variant | 100 histograms | 10,000 | 100,000 |
+|---|---|---|---|
+| running sums, branch on a new best | 2.9 | 2.9 | 2.9 |
+| the same without the branch | 2.9 | 2.9 | 2.9 |
+| running sums first, values 8 at a time, then pick | 4.1 | 4.1 | 4.1 |
+| 8-wide over blocks, 16 threads | 5.7 | 37 | 17 |
+
+[MEASURED, `run M2`; spread under 1% on one thread, up to 19% threaded.]
+
+- **Separating the part that must run in order (the running sums) from the part that need not
+  (the divisions) gains 1.4x.** The three one-thread variants give identical bits. [MEASURED]
+- Branch or no branch makes no difference: a new best is rare, so the branch is predictable.
+- Threads: 9x at 10,000 histograms (40 MB), 4x at 100,000 (400 MB).
+
+## M3: tree ensemble inference (2026-11-19)
+
+100 trees of depth 6. Millions of rows per second.
+
+| Variant | 1,000 rows | 100,000 | 1,000,000 |
+|---|---|---|---|
+| row by row, an `if` at every test | 2.2 | 2.2 | 2.2 |
+| row by row, the step written as arithmetic | 1.9 | 1.9 | 1.9 |
+| 256 rows per tree before the next tree, arithmetic | 2.2 | 2.2 | 2.2 |
+| the same with an `if` at every test | 0.53 | 0.52 | 0.52 |
+| four rows side by side down each tree | 1.1 | 1.1 | 1.1 |
+| eight rows side by side | 1.2 | 1.2 | 1.2 |
+| tree-first arithmetic blocks, 16 threads | 5.7 | 14.5 | 16.1 |
+
+[MEASURED, `run M3`; spread under 2% except the smallest threaded row.]
+
+- **The same `if` is fast in one loop and 4.3x slower in another.** Row by row it runs at 2.2;
+  with the trees on the outside it runs at 0.52. The data is random, so a real branch here is
+  mispredicted half the time; the row-by-row speed suggests the compiler replaced the `if` with
+  a conditional move there and kept a branch in the other loop. Writing the step as arithmetic
+  is never the fastest by much, but it is never the slow one. [MEASURED; the explanation is
+  DERIVED and not checked in the generated code]
+- **Walking four or eight rows side by side halved the speed**, as written here. This is a
+  result about this code, not proof the idea cannot work. [MEASURED]
+- Threads: 7x at a million rows.
+
+## M4: dense layer forward, 256 to 256 with ReLU (2026-11-19)
+
+Thousands of rows per second (each row is 65,536 multiply-adds).
+
+| Variant | 64 rows | 4,096 | 32,768 |
+|---|---|---|---|
+| plain dot product per output | 51 | 51 | 51 |
+| dot product 16 at a time | 627 | 626 | 606 |
+| dot product as four fused running sums | 680 | 680 | 659 |
+| weights by input; all outputs of a row grow together | 598 | 599 | 586 |
+| the last one on 16 threads | 2,702 | 3,040 | 2,984 |
+
+[MEASURED, `run M4`; spread under 5%.]
+
+- **16-wide dot product: 12x.** A plain dot product cannot be vectorised by the compiler, because
+  that would change the order of the additions. [MEASURED; the reason is DERIVED]
+- Four fused running sums add 9%. Storing the weights the other way round is 9% slower than
+  that, not faster.
+- Threads: 4.5x to 5x.
+
+## M5: dense layer weight gradient and update (2026-11-19)
+
+Thousands of batch rows per second (each row is 65,536 multiply-adds).
+
+| Variant | 64 rows | 1,024 | 16,384 |
+|---|---|---|---|
+| batch row by batch row, plain loops | 73 | 77 | 77 |
+| the same order, fused 16-wide | 443 | 623 | 646 |
+| one weight row against the whole batch | 441 | 473 | 399 |
+| one weight row against 64 batch rows at a time | 441 | 612 | 611 |
+| tiled, weight rows over 16 threads | 1,398 | 4,420 | 4,818 |
+
+[MEASURED, `run M5`; spread under 10% on one thread; threaded rows up to 36% at 64 rows.]
+
+- **Fused 16-wide inner step: 6x to 8x** over the plain loop, which the compiler again left
+  unvectorised (the same pattern as S6). [MEASURED]
+- Taking one weight row against the whole batch loses 38% at 16,384 rows (the batch no longer
+  fits the cache); tiling the batch recovers it. The simple row-by-row order is as fast as the
+  tiled one on one thread. [MEASURED]
+- Threads: 7.5x at 16,384 rows.
+
+## M6: one Adam step (2026-11-19)
+
+Billions of parameters per second (7 arrays of 4 bytes each are read or written per parameter).
+
+| Variant | 10,000 | 1,000,000 | 50,000,000 |
+|---|---|---|---|
+| one plain loop | 0.68 | 0.66 | 0.68 |
+| three plain loops | 0.52 | 0.49 | 0.49 |
+| one loop, 16 at a time | 7.3 | 4.9 | 1.4 |
+| 16-wide on 16 threads | 7.3 | 18.4 | 1.5 |
+
+[MEASURED, `run M6`; spread under 3% on one thread, up to 22% threaded. Every variant writes
+identical bits.]
+
+- **16-wide: 11x in cache, 7x at 28 MB, 2x at 1.4 GB.** The plain loop has a square root and a
+  division per parameter and the compiler kept it scalar. [MEASURED]
+- At 50 million parameters threads add nothing (1.1x): the step moves 39 GB/s on one thread
+  already, and memory is the limit. [MEASURED; "memory is the limit" is DERIVED]
+- Splitting into three loops is 25% slower.
+
+## Across the model-learning jobs
+
+- The compiler left every floating-point inner loop scalar (M4, M5, M6, as S6 before). Explicit
+  16-wide code gained 6x to 12x each time.
+- Put things that are updated together next to each other (M1), and split work that must run in
+  order from work that need not (M2).
+- An `if` on unpredictable data can cost 4x or nothing depending on what the compiler makes of
+  it (M3); the arithmetic form is the predictable choice.
+- Two tricks from elsewhere made things worse on this data: alternating tables (M1) and walking
+  several rows side by side (M3). Measure before keeping a trick.

@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M3	arith	100000	52644600.000	52133100.000	0.0099	6	1.8995e6	16671.979545474052	88a4aabc39f6bdc3	0.17.1

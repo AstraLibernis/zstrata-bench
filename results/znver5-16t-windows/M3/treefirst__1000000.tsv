@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M3	treefirst	1000000	449456900.000	448381400.000	0.0030	5	2.2249e6	183280.56451666355	88a4aabc39f6bdc3	0.17.1
