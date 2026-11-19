@@ -609,6 +609,50 @@ one, not measurements of another machine.]
 4. Use `@mulAdd` only behind a check that the build's CPU has the instruction.
 5. Confirm with a timing against the plain loop. Never confirm from an assembly listing.
 
+## Confirmed in the real projects (2026-11-19)
+
+The cross-check (docs/notes/cross-check-2026-11-19.md) listed where zarbor and zscour looked
+behind these measurements. Each claim was then measured in the project's own code, on
+generated data, with the result compared before and after. What reading the code suggested and
+what the measurement said did not always agree, which is the point of this section.
+
+**zscour** (generated 500,000 x 25 CSV, 82 MB; stage timers added to a scratch copy; whole run
+with hyperfine, 5 runs, spread under 1%):
+
+| Claim from reading | Measured share of the run | After the change | Verdict |
+|---|---|---|---|
+| Numeric columns sorted with a comparison sort (D3) | 651 ms of 1,920 (34%) | 75 ms with a radix sort on 64-bit floats | confirmed, and the largest cost |
+| Ranks sorted with an indirect comparison sort (D3) | most of 450 ms (23%) | association stage 122 ms | confirmed |
+| Each number parsed from text three times | about 300 ms (16%) for all three | fill pass 191 -> 139 ms parsing once | real but small; it was guessed to be the top cost and was not |
+| Scalar CSV parser, four passes (D6) | 135 ms (7%) | not changed | real but minor here |
+| Rank correlation is a plain loop (V2) | inside the 122 ms left | not changed | not the cost; the sort was |
+
+Whole run 1.920 -> 0.953 s with a byte-identical report. [MEASURED]
+
+**zarbor** (generated 28 features x 255 bins, logistic, 100 rounds, through the library; three
+runs each, spread under 3% for phases and predict):
+
+| Claim from reading | Measured | Verdict |
+|---|---|---|
+| Tree walk uses an `if` chain; M3's arithmetic step was 4.3x faster | 924 -> 462 ms on one thread (2.0x), 84 -> 65 ms on 16 threads (1.3x), same predictions | confirmed, at half the size M3 suggested: real trees have uneven depth and explicit children |
+| Split scan interleaves divisions with running sums (M2: 1.4x) | split phase 1.6x to 1.7x faster, same splits bit for bit | confirmed; it is 15% of a shallow fit and 36% of a deep one |
+| Logistic gradient is 8 wide where 16 is faster (V3) | gradients are 0.5 to 0.7% of a fit | true and irrelevant |
+| Trees-outermost is the wrong order for prediction (M3) | blocks of 256 to 4,096 rows changed nothing | refuted for zarbor's shape |
+| Threads start too early for small nodes (M1) | raising the threshold: 2.1x faster on small deep fits, 2.2x slower on a 2-million-row fit | both sides were right in their own regime; no single threshold wins |
+| Binning sorts with a comparison sort (D3) | not measured: it runs once per load | open |
+
+[MEASURED; the scratch harness and copies are not in any repo]
+
+What this adds to the list below:
+
+7. A reading of the code finds candidates; only a stage timer says which one is the cost. Of
+   eleven claims, five were confirmed as worth fixing, three were true but too small to matter,
+   two were refuted and one is unmeasured.
+8. A microbenchmark's ratio is an upper bound. The tree walk gained 2.0x, not M3's 4.3x, and
+   1.3x once every core was busy.
+9. Thread thresholds do not transfer between workloads. Measure them at both ends of the sizes
+   the code will see.
+
 ## What the whole set says, in one place
 
 1. Write vectors out for hot loops: this Zig does not vectorise loops by itself (see

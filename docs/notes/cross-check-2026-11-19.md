@@ -4,6 +4,13 @@ A read of zarbor and zscour against the measurements here, and of zstrata agains
 in this note is measured unless it says so: it is a list of what to measure and where each
 project appears to be ahead. [DERIVED from reading the code]
 
+## Outcome (later the same day)
+
+The claims below were measured in the projects themselves: see docs/measurements.md,
+"Confirmed in the real projects". Five were worth fixing and are fixed (zscour 892a333, zarbor
+e134eae); zstrata now exposes a library (03c4dd4: `Pool`, `simd`, `sort`) that zscour uses.
+The list of jobs to add further down is still open.
+
 ## Applied to zstrata (commit bc02a9f)
 
 - Probes used `@mulAdd` without asking whether the CPU has the instruction. Built for a CPU
