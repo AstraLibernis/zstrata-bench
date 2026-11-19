@@ -1,6 +1,6 @@
 # zstrata-bench plan
 
-Status: **B0 to B6 done** (2026-11-19): harness, the map and `look`, 25 jobs on the CPU (data D1 to D7, data science S1 to S6, model learning M1 to M6, vectorisation V1 to V3), and GPU variants for S5, S6, M3, M4 and M6. Next: B7 (LLM and zmural slices, when that work is live) and B8 (using it).
+Status: **B0 to B6 done** (2026-11-19): harness, the map and `look`, 25 jobs on the CPU (data D1 to D7, data science S1 to S6, model learning M1 to M6, vectorisation V1 to V3), and GPU variants for S5, S6, M3, M4 and M6. Next: B7 (LLM and zmural slices, when that work is live) and B8 (using it). Open items: docs/notes/open-items-2026-11-19.md.
 
 ## What this is
 
