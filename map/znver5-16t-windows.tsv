@@ -147,3 +147,12 @@ M6	one Adam optimiser step over an array of parameters	50000000	parameters	one	l
 M6	one Adam optimiser step over an array of parameters	50000000	parameters	gpu	gpu	1.9327e10	28.29	gpu+transfer	6.0347e8	graphics card, data already on it, result left on it
 M6	one Adam optimiser step over an array of parameters	50000000	parameters	gpu	gpu+transfer	6.0347e8	0.88	gpu	1.9327e10	graphics card, from main memory and back
 M6	one Adam optimiser step over an array of parameters	50000000	parameters	all	threads8	1.5709e9	2.30	threads16	1.5466e9	lanes16 over blocks on 8 threads
+V1	a loop that stores: out = y + a * x	1000	values	one	lanes16	4.3290e10	8.49	fused16	4.3497e10	vectors written out, 16 at a time
+V1	a loop that stores: out = y + a * x	100000	values	one	lanes16	1.3661e10	2.76	suggested	1.3650e10	vectors written out, 16 at a time
+V1	a loop that stores: out = y + a * x	10000000	values	one	lanes8	8.1129e9	1.82	lanes16	8.3361e9	vectors written out, 8 at a time
+V2	a loop with a running total: dot product	1000	values	one	lanes16	4.0112e10	14.46	fused16x4	3.8270e10	one running sum of 16, written out
+V2	a loop with a running total: dot product	100000	values	one	lanes16	3.1044e10	11.89	fused16x8	3.1878e10	one running sum of 16, written out
+V2	a loop with a running total: dot product	1000000	values	one	lanes16	1.7110e10	6.58	portable	1.7331e10	one running sum of 16, written out
+V3	a loop that stores, with a square root and a division	1000	values	one	lanes16	1.0092e10	14.28	suggested	1.0090e10	vectors written out, 16 at a time
+V3	a loop that stores, with a square root and a division	100000	values	one	lanes16	9.2452e9	13.16	suggested	9.2602e9	vectors written out, 16 at a time
+V3	a loop that stores, with a square root and a division	10000000	values	one	lanes16	5.1319e9	7.33	suggested	5.1277e9	vectors written out, 16 at a time

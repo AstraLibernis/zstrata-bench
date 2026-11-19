@@ -86,6 +86,9 @@ zig build test                                            Debug: every variant e
   names or paths from other work, or credentials.
 - GPU tests run with the validation layer and its best-practice checks on.
 - Each new test is mutation-checked once (break the code, see it fail, restore), briefly.
+- Hot loops are written as vectors (`@Vector`, width from `std.simd.suggestVectorLength`), with
+  `@mulAdd` only behind a CPU check: this Zig does not vectorise plain loops, and an assembly
+  listing is not evidence either way (docs/measurements.md, "Vectorisation").
 
 **Other repos**
 

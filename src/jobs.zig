@@ -32,6 +32,9 @@ pub const all = [_]*const harness.Job{
     &@import("jobs/model/m4_dense_forward.zig").job,
     &@import("jobs/model/m5_dense_update.zig").job,
     &@import("jobs/model/m6_adam_step.zig").job,
+    &@import("jobs/vector/v1_scaled_add.zig").job,
+    &@import("jobs/vector/v2_dot.zig").job,
+    &@import("jobs/vector/v3_elementwise.zig").job,
 };
 
 test {
@@ -54,6 +57,9 @@ test {
     _ = @import("jobs/model/m4_dense_forward.zig");
     _ = @import("jobs/model/m5_dense_update.zig");
     _ = @import("jobs/model/m6_adam_step.zig");
+    _ = @import("jobs/vector/v1_scaled_add.zig");
+    _ = @import("jobs/vector/v2_dot.zig");
+    _ = @import("jobs/vector/v3_elementwise.zig");
     _ = @import("kit/radix.zig");
     _ = @import("kit/table.zig");
 }

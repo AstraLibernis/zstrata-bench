@@ -285,7 +285,7 @@ Square matrices of 32-bit floats. Billions of multiply-adds per second.
   holds 5.1 at every size. [MEASURED; the cause is DERIVED]
 - **The compiler did not vectorise the swapped loop.** Writing the same step as 16-wide vectors
   is 5x to 8x faster. This is the largest "written this way or that way" gap found so far, and
-  nothing in the plain code hints at it. [MEASURED; why the compiler declines is not known]
+  nothing in the plain code hints at it. [MEASURED; the reason is in "Vectorisation" below]
 - Fused multiply-add adds 4 to 13%. Taking four rows per pass helps only at side 128 (1.3x).
 - Tiling made no difference up to side 1024: the second matrix (4 MB) still fits the cache.
 - Threads: 6.4x at side 1024. Textbook to best is 800x there.
@@ -533,10 +533,86 @@ to 34%.]
   thread: almost every key survives its part, so the merge on one thread does the whole job
   again. [MEASURED; the reason is DERIVED]
 
+## Vectorisation: why plain loops stay slow, and how to write them (2026-11-19)
+
+Three jobs isolate the question: V1 (`out = y + a * x`, a loop that stores), V2 (dot product, a
+loop with a running total) and V3 (a storing loop with a square root and a division). Billions
+of values per second, one thread, build for this machine (AVX-512).
+
+| Variant | V1 at 1,000 | V1 at 10 million | V2 at 1,000 | V2 at 1 million | V3 at 1,000 | V3 at 10 million |
+|---|---|---|---|---|---|---|
+| plain loop | 5.1 | 4.5 | 2.8 | 2.6 | 0.71 | 0.70 |
+| plain loop, `noalias` parameters | 5.1 | 4.4 | | | 0.71 | 0.70 |
+| plain loop, `@setFloatMode(.optimized)` | | | 1.4 | 1.3 | | |
+| vectors written out, 8 wide | 30 | 8.1 | | | 5.7 | 4.6 |
+| vectors written out, 16 wide | 43 | 8.3 | 40 | 17 | 10.1 | 5.1 |
+| width from `std.simd.suggestVectorLength` | 43 | 8.3 | 38 | 17 | 10.1 | 5.1 |
+
+[MEASURED, `run V1`, `run V2`, `run V3`; spread under 2% except the 10-million rows, up to 5%.]
+
+- **This Zig (0.17.1) does not turn loops into vector code in the program it builds.** Eight
+  ways of writing a storing loop were timed (slices, an index, raw pointers, `noalias`, in
+  place on one slice, integers instead of floats): all ran one value at a time. Build options
+  (`-fllvm`, `-fstrip`, `-fsingle-threaded`, `-lc`, `-mcpu=x86_64_v3`) changed nothing.
+  [MEASURED, scratch program, hyperfine] A forum thread reports the same from Zig 0.16 on
+  (https://ziggit.dev/t/optimizing-the-goertzel-algorithm/16233); why upstream has it this way
+  was not looked into.
+- **The assembly listing from `-femit-asm` cannot be trusted on this point.** For the `noalias`
+  loop the listing shows an 8-wide vector loop, while the bytes of the same function in the
+  program built by the same command are one-at-a-time instructions, and it runs at
+  one-at-a-time speed. Judge by timing, or by reading the built program, never by the listing.
+  [MEASURED: the function's own bytes printed from inside the program]
+- **`noalias` gains nothing here, and `@setFloatMode(.optimized)` made the dot product 2x
+  slower** on this build. Neither is a route to vector code. [MEASURED]
+- **Writing the vectors out is the fix: 6x to 14x** while the data fits the cache, about 2x
+  for V1 at 10 million values where memory speed takes over, and 7x for V3 at any size because
+  square root and division dominate. [MEASURED]
+
+**The same source built for other CPUs**, run on this machine at 100,000 values (billions per
+second). `x86_64` is the plainest 64-bit CPU (SSE2, 4 floats per register, no fused
+multiply-add); `x86_64_v3` is AVX2 (8 floats).
+
+| Variant | built for x86_64 | built for x86_64_v3 | built for this CPU |
+|---|---|---|---|
+| V1 plain | 4.9 | 4.8 | 4.9 |
+| V1 vectors, 16 wide | 12.6 | 13.1 | 13.7 |
+| V1 vectors, suggested width (4 / 8 / 16) | 12.3 | 12.9 | 13.7 |
+| V1 16 wide with `@mulAdd` | 0.36 | 13.1 | 13.6 |
+| V2 plain | 2.6 | 2.6 | 2.6 |
+| V2 vectors, 16 wide | 20.8 | 29 | 31 |
+| V2 16 wide, four sums, `@mulAdd` | 1.0 | 33 | 31 |
+| V2 portable (suggested width, `@mulAdd` only if the CPU has it) | 20.8 | 33 | 31 |
+| V3 plain | 0.70 | 0.70 | 0.70 |
+| V3 vectors, 16 wide | 2.5 | 5.2 | 9.2 |
+| V3 vectors, suggested width | 2.7 | 5.2 | 9.3 |
+
+[MEASURED, `zig build -Doptimize=ReleaseFast -Dcpu=x86_64` (and `x86_64_v3`), then
+`run V1 --size 100000` and so on; spread under 4%. These are builds for another CPU run on this
+one, not measurements of another machine.]
+
+- **Vector code is portable.** `@Vector(16, f32)` compiles for any CPU; on a narrower one the
+  compiler splits it into what the CPU has, and it stayed within 7% of the suggested width in
+  every case. On the plainest 64-bit CPU the written-out version is still 2.5x to 8x faster
+  than the plain loop. [MEASURED]
+- **`@mulAdd` is the one thing here that is not portable in speed.** On a CPU without the
+  instruction it gives the right answer through a library routine per value: 20x to 35x slower
+  than not fusing at all. Ask the build first (`builtin.cpu.has(.x86, .fma)`), as V2's
+  `portable` variant does. [MEASURED]
+
+**How to write a hot loop, from the above:**
+
+1. Take the width from `std.simd.suggestVectorLength(T) orelse 4`. A fixed 16 is also fine.
+2. Main loop on `@Vector(width, T)` loaded from `slice[i..][0..width].*`, then a plain loop
+   for the leftover values.
+3. For a running total, keep the total as a vector and `@reduce` once at the end. The result
+   differs from the plain loop in the last bits, because the additions happen in another order.
+4. Use `@mulAdd` only behind a check that the build's CPU has the instruction.
+5. Confirm with a timing against the plain loop. Never confirm from an assembly listing.
+
 ## What the whole set says, in one place
 
-1. Write vectors out for floating-point loops; the compiler left them scalar in every case
-   measured (S1, S4, S5, S6, M4, M5, M6): 6x to 13x.
+1. Write vectors out for hot loops: this Zig does not vectorise loops by itself (see
+   "Vectorisation"), which cost 6x to 13x in every case measured (S1, S4, S5, S6, M4, M5, M6).
 2. Do not branch on data that is a coin flip (D2, D6); write the step so it always runs.
 3. Prefer passes that read memory in order to tables that jump around: sort then scan beat
    hashing on one thread for grouping, joining and removing duplicates (D4, D5, D7).
