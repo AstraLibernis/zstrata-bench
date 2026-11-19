@@ -11,7 +11,7 @@ this way or that way?" is looked up instead of guessed.
 - How to work on it and add a job: [`docs/GUIDE.md`](docs/GUIDE.md)
 - Numbers and what they mean: [`docs/measurements.md`](docs/measurements.md)
 
-Status: the harness, the data-processing jobs D1 to D5 (sum, filter, sort, group, join) and the
+Status: the harness, the data-processing jobs D1 to D5, the data-science jobs S1 to S6 and the
 lookup are done.
 
 ```sh

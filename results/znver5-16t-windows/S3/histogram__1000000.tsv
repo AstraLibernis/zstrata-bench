@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S3	histogram	1000000	793700.000	787100.000	0.0110	31	1.2599e9	2.499466121196747	31c66c45ba1178a7	0.17.1

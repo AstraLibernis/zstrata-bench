@@ -163,3 +163,137 @@ variant builds its index inside the timed run.
 - Threads help most when each thread's working data fits in cache (few groups, mid-sized
   columns), and least when one pass over memory is the whole job.
 - Standard-library containers were never the fastest, and never fell into a trap either.
+
+## S1: column statistics (2026-11-19)
+
+Mean, variance, minimum and maximum of a column. Billions of values per second.
+
+| Variant | 40 KB | 4 MB | 400 MB |
+|---|---|---|---|
+| one loop, one value at a time | 0.96 | 0.95 | 0.95 |
+| four simple loops | 0.36 | 0.35 | 0.35 |
+| one loop, 16 values at a time | 9.6 | 9.9 | 9.2 |
+| 16-wide on 16 threads | 9.7 | 117 | 17.9 |
+
+[MEASURED, `run S1`; spread under 3% except the threaded 4 MB rows, 6 to 7%.]
+
+- **16-wide vectors: 10x**, at every size. [MEASURED]
+- **Four simple loops are 2.7x slower than one**, not faster: the compiler did not turn the
+  separate sum, min and max loops into anything quicker than the combined loop. [MEASURED]
+- Threads: 12x at 4 MB, 1.9x at 400 MB (memory again).
+
+## S2: histogram, 256 bins (2026-11-19)
+
+Billions of values per second.
+
+| Variant | 40 KB | 4 MB | 400 MB |
+|---|---|---|---|
+| one table | 4.0 | 4.2 | 4.2 |
+| four tables fed in turn | 3.7 | 4.3 | 4.3 |
+| 16 bin numbers at once, four tables | 4.2 | 4.6 | 4.6 |
+| 16 parts on 16 threads | 5.6 | 32 | 17 |
+
+[MEASURED, `run S2`; spread under 1% on one thread, up to 12% threaded.]
+
+- **The plain loop is already within 10% of the tricks.** Four tables and wide bin numbers help
+  when neighbouring values often land in the same bin; with evenly spread values they rarely do.
+  A column with long runs of equal values would be the case to measure next. [MEASURED; the
+  reason is DERIVED]
+- Threads: 7x at 4 MB, 4x at 400 MB.
+
+## S3: quantiles (2026-11-19)
+
+The values at five positions of the sorted column. Millions of values per second.
+
+| Variant | 10,000 | 1,000,000 | 10,000,000 |
+|---|---|---|---|
+| sort a copy (std.sort.pdq) | 62 | 34 | 33 |
+| radix sort a copy | 304 | 300 | 286 |
+| partition around each position | 566 | 86 | 88 |
+| count top 16 bits, sort only the bins that matter | 301 | 1,260 | 1,261 |
+| the same, counting on 16 threads | 52 | 1,224 | 1,481 |
+
+[MEASURED, `run S3`; spread under 5% except the 10,000 rows of the partition and threaded
+variants, up to 10%.]
+
+- **For a few quantiles of a large column, do not sort.** Counting the top bits and sorting only
+  the bins that hold a wanted position is 37x faster than sorting and 4.2x faster than a radix
+  sort from a million values up. It also needs no copy of the column. [MEASURED]
+- **Small columns: partition.** At 10,000 values it is the fastest (566), and counting 65,536
+  bins costs more than the data. [MEASURED]
+- Threads add at most 17% (10 million values) and cost 6x at 10,000 values.
+
+## S4: correlation between 8 columns (2026-11-19)
+
+Millions of rows per second (each row is 8 values; 44 sums are needed).
+
+| Variant | 10,000 rows | 1,000,000 | 10,000,000 |
+|---|---|---|---|
+| one plain pass per column and per pair (44 passes) | 48 | 48 | 48 |
+| the 44 passes, 16 values at a time | 467 | 410 | 310 |
+| rows stored together, one pass | 334 | 334 | 335 |
+| columns stored apart, one pass | 240 | 236 | 239 |
+| 16-wide passes over 4,096 rows at a time | 513 | 491 | 404 |
+| 16-wide passes over blocks, 16 threads | 501 | 3,621 | 1,975 |
+
+[MEASURED, `run S4`; spread under 7%.]
+
+- **Many passes are fine if each piece stays in cache.** 44 wide passes over 4,096 rows at a time
+  is the fastest one-thread way at every size, 8x to 10x over the plain passes. Without the
+  pieces, the same 44 passes fall from 467 to 310 as the table outgrows the cache. [MEASURED]
+- **Row storage is steady** (334 at every size) and beats the unpieced column passes at 10
+  million rows, but never the pieced ones. [MEASURED]
+- Threads: 7x at a million rows, 5x at ten million.
+
+## S5: nearest neighbour for every point, 8 dimensions (2026-11-19)
+
+All pairs of points. Billions of pairs per second (a pair is 8 subtractions and 8 multiplies).
+
+| Variant | 1,000 points | 4,000 points | 16,000 points |
+|---|---|---|---|
+| three plain loops | 0.65 | 0.65 | 0.65 |
+| each pair's 8 dimensions as one vector | 0.80 | 0.80 | 0.80 |
+| one array per dimension, 16 other points at a time | 8.3 | 6.8 | 7.8 |
+| the same on 16 threads | 12.6 | 35.7 | 44.5 |
+
+[MEASURED, `run S5`; spread under 1% on one thread except 12% for the 4,000-point wide row;
+the 8-thread rows are noisy (12 to 49%) and are not shown.]
+
+- **Vectorise across the many, not across the few.** Making a vector of a pair's 8 dimensions
+  gains 1.2x; storing each dimension as its own array and taking 16 other points at once gains
+  12x. Same arithmetic, different layout. [MEASURED]
+- Threads: 5.7x at 16,000 points.
+
+## S6: matrix multiply (2026-11-19)
+
+Square matrices of 32-bit floats. Billions of multiply-adds per second.
+
+| Variant | side 128 | side 512 | side 1024 |
+|---|---|---|---|
+| textbook loops (row, column, sum) | 3.3 | 1.0 | 0.32 |
+| inner loops swapped | 5.0 | 5.1 | 5.1 |
+| swapped, second matrix 128 rows at a time | 5.0 | 5.2 | 5.1 |
+| inner step written as 16-wide vectors | 27 | 37 | 42 |
+| 16-wide with fused multiply-add | 28 | 40 | 47 |
+| fused, four rows per pass | 36 | 41 | 41 |
+| fused, four rows per pass, 16 threads | 144 | 242 | 259 |
+
+[MEASURED, `run S6`; spread under 3% on one thread, up to 10% threaded.]
+
+- **The textbook order collapses as the matrix grows**: 10x slower per multiply-add at side 1024
+  than at 128, because it walks the second matrix down its columns. Swapping the inner loops
+  holds 5.1 at every size. [MEASURED; the cause is DERIVED]
+- **The compiler did not vectorise the swapped loop.** Writing the same step as 16-wide vectors
+  is 5x to 8x faster. This is the largest "written this way or that way" gap found so far, and
+  nothing in the plain code hints at it. [MEASURED; why the compiler declines is not known]
+- Fused multiply-add adds 4 to 13%. Taking four rows per pass helps only at side 128 (1.3x).
+- Tiling made no difference up to side 1024: the second matrix (4 MB) still fits the cache.
+- Threads: 6.4x at side 1024. Textbook to best is 800x there.
+
+## Across the data-science jobs
+
+- Write the vectors out. In S1, S4, S5 and S6 the explicit 16-wide version is 8x to 12x faster
+  than the plain loop, and in S6 the compiler vectorised nothing it was expected to.
+- Lay data out so the long direction is the vector direction (S5), and cut long passes into
+  cache-sized pieces when there are many of them (S4).
+- A cheap counting pass can replace a sort when only a few positions are wanted (S3).

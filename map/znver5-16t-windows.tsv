@@ -37,3 +37,35 @@ D5	join a large table to one a tenth its size	1000000	rows	one	sortmerge	1.9821e
 D5	join a large table to one a tenth its size	1000000	rows	all	threads16	8.1606e8	11.94	threads8	5.7917e8	table built on one thread, looked up on 16
 D5	join a large table to one a tenth its size	20000000	rows	one	sortmerge	1.4662e8	1.96	std	7.4931e7	radix sort both sides by key, then walk them together
 D5	join a large table to one a tenth its size	20000000	rows	all	threads16	6.1906e8	8.26	threads8	3.7975e8	table built on one thread, looked up on 16
+S1	column statistics: mean, variance, min, max	10000	values	one	lanes16	9.6469e9	10.10	onepass	9.5560e8	one loop, 16 values at a time
+S1	column statistics: mean, variance, min, max	1000000	values	one	lanes16	9.8580e9	10.34	onepass	9.5329e8	one loop, 16 values at a time
+S1	column statistics: mean, variance, min, max	1000000	values	all	threads16	1.1710e11	122.84	threads8	6.4312e10	lanes16 on 16 threads
+S1	column statistics: mean, variance, min, max	100000000	values	one	lanes16	9.2049e9	9.67	onepass	9.5164e8	one loop, 16 values at a time
+S1	column statistics: mean, variance, min, max	100000000	values	all	threads8	1.8006e10	18.92	threads16	1.7857e10	lanes16 on 8 threads
+S2	histogram of a column, 256 bins	10000	values	one	bins16	4.1846e9	1.05	onetable	3.9851e9	16 bin numbers worked out at once, counted into four tables
+S2	histogram of a column, 256 bins	10000	values	all	threads8	5.8286e9	1.46	threads16	5.5556e9	16 parts with their own tables, on 8 threads
+S2	histogram of a column, 256 bins	1000000	values	one	bins16	4.6425e9	1.10	fourtables	4.3122e9	16 bin numbers worked out at once, counted into four tables
+S2	histogram of a column, 256 bins	1000000	values	all	threads16	3.2389e10	7.68	threads8	1.7897e10	16 parts with their own tables, on 16 threads
+S2	histogram of a column, 256 bins	100000000	values	one	bins16	4.5620e9	1.08	fourtables	4.2606e9	16 bin numbers worked out at once, counted into four tables
+S2	histogram of a column, 256 bins	100000000	values	all	threads8	1.6419e10	3.90	threads16	1.6831e10	16 parts with their own tables, on 8 threads
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000	values	one	select	5.6593e8	9.14	radix	3.0434e8	partition a copy around each position, no full sort
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	1000000	values	one	histogram	1.2599e9	36.57	radix	3.0029e8	count the top 16 bits, then sort only the bins that hold a position
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000000	values	one	histogram	1.2607e9	38.08	radix	2.8628e8	count the top 16 bits, then sort only the bins that hold a position
+S3	quantiles of a column (1, 25, 50, 75, 99 percent)	10000000	values	all	threads8	1.4415e9	43.54	threads16	1.4814e9	histogram with the counting pass on 8 threads
+S4	correlation between 8 columns	10000	rows	one	pieces	5.1247e8	10.57	pairs16	4.6677e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
+S4	correlation between 8 columns	1000000	rows	one	pieces	4.9118e8	10.17	pairs16	4.0960e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
+S4	correlation between 8 columns	1000000	rows	all	threads8	2.6247e9	54.35	threads16	3.6206e9	pairs16 over blocks of rows on 8 threads
+S4	correlation between 8 columns	10000000	rows	one	pieces	4.0418e8	8.39	rowlayout	3.3536e8	pairs16 over 4,096 rows at a time, so each piece stays in cache
+S4	correlation between 8 columns	10000000	rows	all	threads16	1.9748e9	40.98	threads8	1.4898e9	pairs16 over blocks of rows on 16 threads
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	1000000	pairs	one	points16	8.3179e9	12.82	dims8	8.0064e8	one array per dimension, 16 other points at a time
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	1000000	pairs	all	threads8	2.1311e10	32.84	threads16	1.2552e10	points16 on 8 threads
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	16000000	pairs	one	points16	6.8172e9	10.52	dims8	7.9908e8	one array per dimension, 16 other points at a time
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	16000000	pairs	all	threads8	5.0314e10	77.66	threads16	3.5730e10	points16 on 8 threads
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	one	points16	7.7956e9	12.05	dims8	7.9821e8	one array per dimension, 16 other points at a time
+S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	all	threads16	4.4527e10	68.83	threads8	2.7871e10	points16 on 16 threads
+S6	multiply two square matrices	2097152	multiply-adds	one	fused4	3.6255e10	11.06	fused	2.7586e10	fused, four rows of the second matrix per pass
+S6	multiply two square matrices	2097152	multiply-adds	all	threads16	1.4401e11	43.95	threads8	1.1985e11	fused4, result rows shared out over 16 threads
+S6	multiply two square matrices	134217728	multiply-adds	one	fused	4.0273e10	38.98	fused4	4.0509e10	lanes16 with fused multiply-add
+S6	multiply two square matrices	134217728	multiply-adds	all	threads8	2.5151e11	243.45	threads16	2.4220e11	fused4, result rows shared out over 8 threads
+S6	multiply two square matrices	1073741824	multiply-adds	one	fused	4.7406e10	146.10	lanes16	4.1943e10	lanes16 with fused multiply-add
+S6	multiply two square matrices	1073741824	multiply-adds	all	threads16	2.5939e11	799.43	threads8	1.4141e11	fused4, result rows shared out over 16 threads
