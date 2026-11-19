@@ -82,6 +82,8 @@ zig build test                                            Debug: every variant e
   allocation, `defer`/`errdefer` at the acquire, no large stack arrays in hot paths, pool tasks
   correct when one worker gets the whole range, reductions in a fixed order.
 - Inputs are generated from a fixed seed. No timing depends on data that changes between runs.
+- The repo is public. Inputs are synthetic examples only: never real datasets, competition data,
+  names or paths from other work, or credentials.
 - GPU tests run with the validation layer and its best-practice checks on.
 - Each new test is mutation-checked once (break the code, see it fail, restore), briefly.
 

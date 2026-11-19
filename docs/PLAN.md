@@ -151,14 +151,16 @@ Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` tick
 - **B8 Use it.** Add the lookup to the Zig working habit (the zcanon skill text), and apply
   results to a project when that project is next worked on. Both touch other repos: ask first.
 
-## Decisions for the owner
+## Decisions (owner, 2026-11-19)
 
-1. **Z1:** may zstrata get the `profile` export? (Recommended: yes. It is the clean hand-off between
-   the two projects.)
-2. **Sharing code:** zstrata-bench needs zstrata's Vulkan layer and thread pool. Depend on zstrata
-   as a Zig package (recommended: one copy, one place to fix), or copy the two files in.
-3. **First slice:** data processing first (recommended), or another.
-4. **Visibility:** the repo starts private. Say when it should be public.
+1. **Z1, the `profile` export in zstrata: open.** Not decided yet. B0 does not need it: it reads
+   the few facts it uses from zstrata's existing results file.
+2. **Sharing code: decided.** zstrata is used as a reference or library. zstrata-bench depends on
+   it as a Zig package for the Vulkan layer and thread pool; nothing is copied.
+3. **First slice: decided.** Data processing.
+4. **Visibility: decided, public.** Nothing private goes into this repo. Every input is a generated
+   example (seeded, synthetic): no real datasets, no competition data, no file paths or names from
+   the owner's other work, no credentials. Results describe one machine by its hardware only.
 
 ## Risks
 
