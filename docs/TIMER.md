@@ -85,6 +85,10 @@ Rules that hold throughout:
 
 - Without a shell, a command that contains `| & ; < >`, a backtick or `$(` outside quotes is
   refused, as in hyperfine 2.0: add `-S` or quote the character.
+- When the shell is cmd.exe, the command reaches it exactly as written, as in hyperfine:
+  cmd.exe parses its own command line and does not understand the C runtime's quoting, so
+  `bash -c "a >> b"` or `echo "x" | findstr x` would otherwise arrive mangled. Other shells
+  (bash, sh, pwsh) get the command as one quoted argument.
 - Hooks always run through a shell (the chosen one, else cmd.exe / sh). A hook that fails stops
   everything, as does a benchmarked command that exits non-zero without `-i`.
 - With a shell, its own start-up is measured first (the mean of 50 runs of an empty command)
@@ -127,6 +131,10 @@ three rounds, wall-time mean ± σ:
 
 [DERIVED] The two agree within one σ in every pair. The gap is at most 0.07 ms and changes sign
 between rounds.
+
+[MEASURED] Through cmd.exe (`-S -w 3 -r 30`, shell start-up subtracted by both),
+`powershell -NoProfile -c "1+1"`, two rounds: hyperfine 118.97 ± 1.67 and 119.51 ± 5.80 ms,
+zstrata-bench 117.97 ± 1.38 and 118.35 ± 1.43 ms. [DERIVED] Within one σ.
 
 [MEASURED] `cmd /c "powershell -NoProfile -c 1"`, 10 runs, `--metrics all`: peak memory of
 `cmd` itself 8.0 MiB, peak commit of the tree 59.1 MiB, 2 processes. A per-process probe

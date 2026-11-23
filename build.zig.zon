@@ -1,6 +1,6 @@
 .{
     .name = .zstrata_bench,
-    .version = "0.1.0",
+    .version = "0.2.0",
     .dependencies = .{
         // zstrata is used as a library (its thread pool and its Vulkan layer). To build against a
         // local checkout instead, replace url and hash with: .path = "../zstrata"

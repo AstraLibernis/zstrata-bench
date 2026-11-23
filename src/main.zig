@@ -53,7 +53,7 @@ pub fn main(init: std.process.Init) !void {
     if (argv.len >= 2 and std.mem.eql(u8, argv[1], "time")) {
         var ebuf: [1024]u8 = undefined;
         var stderr = std.Io.File.stderr().writerStreaming(init.io, &ebuf);
-        const tcode = timer.main(gpa, init.io, init.environ_map, argv[2..], out, &stderr.interface) catch |err| blk: {
+        const tcode = timer.main(gpa, init.io, init.environ_map, argv[2..], out, &stderr.interface, @import("build_options").version) catch |err| blk: {
             try out.flush();
             try stderr.interface.print("error: {s}\n", .{@errorName(err)});
             break :blk 1;

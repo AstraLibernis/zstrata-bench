@@ -71,6 +71,9 @@ const shell_calibration_runs = 50;
 const fast_shell_warning_s: f64 = 0.005;
 
 const Ctx = struct {
+    version: []const u8,
+    /// For the per-run scratch of a raw Windows start (freed at once).
+    gpa: std.mem.Allocator,
     arena: std.mem.Allocator,
     io: std.Io,
     base_env: *const std.process.Environ.Map,
@@ -82,7 +85,8 @@ const Ctx = struct {
     overhead: metric.Sample = .{},
 };
 
-pub fn main(gpa: std.mem.Allocator, io: std.Io, base_env: *const std.process.Environ.Map, argv: []const []const u8, out: *std.Io.Writer, err: *std.Io.Writer) !u8 {
+/// `version` is zstrata-bench's own (from build.zig.zon), for --version and the exports.
+pub fn main(gpa: std.mem.Allocator, io: std.Io, base_env: *const std.process.Environ.Map, argv: []const []const u8, out: *std.Io.Writer, err: *std.Io.Writer, version: []const u8) !u8 {
     var arena_state: std.heap.ArenaAllocator = .init(gpa);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
@@ -97,7 +101,7 @@ pub fn main(gpa: std.mem.Allocator, io: std.Io, base_env: *const std.process.Env
         return 0;
     }
     if (opts.version) {
-        try out.print("zstrata-bench time (hyperfine 2.0 options), built with Zig {s}\n", .{builtin.zig_version_string});
+        try out.print("zstrata-bench {s}\n", .{version});
         return 0;
     }
     const benches = cli.expand(arena, &opts, &diag) catch |e| switch (e) {
@@ -105,7 +109,7 @@ pub fn main(gpa: std.mem.Allocator, io: std.Io, base_env: *const std.process.Env
         else => return e,
     };
 
-    var ctx: Ctx = .{ .arena = arena, .io = io, .base_env = base_env, .opts = &opts, .out = out, .err = err, .quiet = opts.style == .none };
+    var ctx: Ctx = .{ .version = version, .gpa = gpa, .arena = arena, .io = io, .base_env = base_env, .opts = &opts, .out = out, .err = err, .quiet = opts.style == .none };
     const start_time: i64 = @intCast(std.math.clamp(@divFloor(std.Io.Clock.real.now(io).nanoseconds, std.time.ns_per_s), 0, std.math.maxInt(i64)));
 
     if (opts.shell != .none) ctx.overhead = calibrate(&ctx) catch |e| return failed(&ctx, e);
@@ -173,23 +177,49 @@ fn shellPrefix(ctx: *Ctx, shell: cli.Shell) Stop![]const []const u8 {
     };
 }
 
-fn withCommand(ctx: *Ctx, prefix: []const []const u8, command: []const u8) Stop![]const []const u8 {
-    const all = try ctx.arena.alloc([]const u8, prefix.len + 1);
-    @memcpy(all[0..prefix.len], prefix);
-    all[prefix.len] = command;
-    return all;
+fn isCmd(exe: []const u8) bool {
+    const base = std.Io.Dir.path.basename(exe);
+    return std.ascii.eqlIgnoreCase(base, "cmd") or std.ascii.eqlIgnoreCase(base, "cmd.exe");
 }
 
-/// The argv a benchmarked command runs as.
-fn commandArgv(ctx: *Ctx, command: []const u8) Stop![]const []const u8 {
-    if (ctx.opts.shell == .none) {
+/// How a command is started: an argv, or on Windows for cmd.exe the command line as written.
+const Launch = struct {
+    argv: []const []const u8,
+    raw_line: ?[]const u8 = null,
+};
+
+/// Benchmarked commands use the chosen shell (none: split into words); hooks always use one.
+fn launch(ctx: *Ctx, command: []const u8, shell: cli.Shell) Stop!Launch {
+    if (shell == .none) {
         var diag: cli.Diag = .{};
-        return cli.splitWords(ctx.arena, command, &diag) catch |e| switch (e) {
-            error.Usage => stop(ctx, "{s}", .{diag.msg}),
-            error.OutOfMemory => error.OutOfMemory,
-        };
+        return .{ .argv = cli.splitWords(ctx.arena, command, &diag) catch |e| switch (e) {
+            error.Usage => return stop(ctx, "{s}", .{diag.msg}),
+            error.OutOfMemory => return error.OutOfMemory,
+        } };
     }
-    return withCommand(ctx, try shellPrefix(ctx, ctx.opts.shell), command);
+    const prefix = try shellPrefix(ctx, shell);
+    const argv = try ctx.arena.alloc([]const u8, prefix.len + 1);
+    @memcpy(argv[0..prefix.len], prefix);
+    argv[prefix.len] = command;
+    var l: Launch = .{ .argv = argv };
+    if (builtin.os.tag == .windows and isCmd(prefix[0])) {
+        // cmd.exe reads its command line itself: hand it over unchanged, as hyperfine does.
+        var line: std.ArrayList(u8) = .empty;
+        for (prefix) |word| {
+            const quote = std.mem.findAny(u8, word, " \t") != null;
+            if (quote) try line.append(ctx.arena, '"');
+            try line.appendSlice(ctx.arena, word);
+            if (quote) try line.append(ctx.arena, '"');
+            try line.append(ctx.arena, ' ');
+        }
+        try line.appendSlice(ctx.arena, command);
+        l.raw_line = line.items;
+    }
+    return l;
+}
+
+fn hookShell(ctx: *const Ctx) cli.Shell {
+    return if (ctx.opts.shell == .none) .default else ctx.opts.shell;
 }
 
 /// The parent environment plus `assignments` ("A=1 B='x y'"), or null for no change.
@@ -212,20 +242,30 @@ fn environment(ctx: *Ctx, assignments: ?[]const u8) Stop!?*const std.process.Env
     return map;
 }
 
-fn runHook(ctx: *Ctx, what: []const u8, command: ?[]const u8, env: ?*const std.process.Environ.Map) Stop!f64 {
-    const c = command orelse return 0;
-    const argv = try withCommand(ctx, try shellPrefix(ctx, ctx.opts.shell), c);
-    var code: ?i64 = null;
-    var why: []const u8 = "";
-    return proc.hook(ctx.io, argv, env, &code, &why) catch |e| switch (e) {
-        error.HookFailed => if (code) |k|
-            stop(ctx, "the {s} command '{s}' exited with code {d}", .{ what, c, k })
-        else
-            stop(ctx, "the {s} command '{s}' was killed", .{ what, c }),
-        error.SpawnFailed => stop(ctx, "could not start the {s} command '{s}': {s}", .{ what, c, why }),
-        error.OutOfMemory => error.OutOfMemory,
-    };
+/// A hook: its text (for messages) and how it starts.
+const Hook = struct { text: []const u8, launch: Launch };
+
+fn hook(ctx: *Ctx, command: ?[]const u8) Stop!?Hook {
+    const c = command orelse return null;
+    return .{ .text = c, .launch = try launch(ctx, c, hookShell(ctx)) };
 }
+
+/// Runs a hook with its output discarded; returns its wall time. A non-zero exit stops everything.
+fn runHook(ctx: *Ctx, what: []const u8, h: ?Hook, env: ?*const std.process.Environ.Map) Stop!f64 {
+    const k = h orelse return 0;
+    var why: []const u8 = "";
+    const s = proc.measure(ctx.io, ctx.gpa, .{ .argv = k.launch.argv, .raw_line = k.launch.raw_line, .environ_map = env, .input = .null, .output = .null }, &why) catch |e| switch (e) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return stop(ctx, "could not start the {s} command '{s}': {s}", .{ what, k.text, why }),
+    };
+    if (s.exit_code) |code| {
+        if (code != 0) return stop(ctx, "the {s} command '{s}' exited with code {d}", .{ what, k.text, code });
+    } else return stop(ctx, "the {s} command '{s}' was killed", .{ what, k.text });
+    return s.values.get(.time_wall_clock);
+}
+
+/// The hooks of one benchmark, prepared once.
+const Hooks = struct { setup: ?Hook, prepare: ?Hook, conclude: ?Hook, cleanup: ?Hook };
 
 fn ignored(ctx: *Ctx, code: ?i64) bool {
     const c = code orelse return ctx.opts.ignore == .all;
@@ -239,10 +279,10 @@ fn ignored(ctx: *Ctx, code: ?i64) bool {
 
 /// One timed (or warm-up) run with its prepare and conclude. Returns the sample and the time the
 /// two hooks took, which counts against the automatic time budget.
-fn oneRun(ctx: *Ctx, b: *const cli.Bench, argv: []const []const u8, env: ?*const std.process.Environ.Map) Stop!struct { sample: metric.Sample, hooks_s: f64 } {
-    const prep = try runHook(ctx, "prepare", b.prepare, env);
+fn oneRun(ctx: *Ctx, b: *const cli.Bench, l: Launch, hooks: *const Hooks, env: ?*const std.process.Environ.Map) Stop!struct { sample: metric.Sample, hooks_s: f64 } {
+    const prep = try runHook(ctx, "prepare", hooks.prepare, env);
     var why: []const u8 = "";
-    var s = proc.measure(ctx.io, .{ .argv = argv, .environ_map = env, .input = ctx.opts.input, .output = b.output }, &why) catch |e| switch (e) {
+    var s = proc.measure(ctx.io, ctx.gpa, .{ .argv = l.argv, .raw_line = l.raw_line, .environ_map = env, .input = ctx.opts.input, .output = b.output }, &why) catch |e| switch (e) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InputFile => return stop(ctx, "cannot open --input file: {s}", .{why}),
         error.OutputFile => return stop(ctx, "cannot create --output file: {s}", .{why}),
@@ -254,7 +294,7 @@ fn oneRun(ctx: *Ctx, b: *const cli.Bench, argv: []const []const u8, env: ?*const
         else
             return stop(ctx, "command '{s}' was killed by a signal. Use -i to keep such runs.", .{b.command});
     }
-    const conc = try runHook(ctx, "conclude", b.conclude, env);
+    const conc = try runHook(ctx, "conclude", hooks.conclude, env);
     if (ctx.opts.shell != .none) {
         for ([_]Metric{ .time_wall_clock, .time_cpu, .time_user, .time_system }) |m| {
             s.values.set(m, @max(s.values.get(m) - ctx.overhead.values.get(m), 0));
@@ -274,19 +314,25 @@ fn runCount(o: *const cli.Options, first_s: f64) u64 {
 
 fn runBench(ctx: *Ctx, b: *const cli.Bench) Stop!report.Result {
     const env = try environment(ctx, b.env);
-    const argv = try commandArgv(ctx, b.command);
-    _ = try runHook(ctx, "setup", b.setup, env);
-    for (0..ctx.opts.warmup) |_| _ = try oneRun(ctx, b, argv, env);
+    const l = try launch(ctx, b.command, ctx.opts.shell);
+    const hooks: Hooks = .{
+        .setup = try hook(ctx, b.setup),
+        .prepare = try hook(ctx, b.prepare),
+        .conclude = try hook(ctx, b.conclude),
+        .cleanup = try hook(ctx, b.cleanup),
+    };
+    _ = try runHook(ctx, "setup", hooks.setup, env);
+    for (0..ctx.opts.warmup) |_| _ = try oneRun(ctx, b, l, &hooks, env);
 
     var samples: std.ArrayList(metric.Sample) = .empty;
-    const first = try oneRun(ctx, b, argv, env);
+    const first = try oneRun(ctx, b, l, &hooks, env);
     try samples.append(ctx.arena, first.sample);
     const total = runCount(ctx.opts, first.sample.values.get(.time_wall_clock) + first.hooks_s);
     while (samples.items.len < total) {
-        const r = try oneRun(ctx, b, argv, env);
+        const r = try oneRun(ctx, b, l, &hooks, env);
         try samples.append(ctx.arena, r.sample);
     }
-    _ = try runHook(ctx, "cleanup", b.cleanup, env);
+    _ = try runHook(ctx, "cleanup", hooks.cleanup, env);
 
     var r: report.Result = .{ .bench = b.*, .samples = samples.items, .summaries = .initFill(null) };
     const xs = try ctx.arena.alloc(f64, samples.items.len);
@@ -331,13 +377,13 @@ fn warnings(ctx: *Ctx, r: *const report.Result) !void {
 
 /// Mean start-up cost of the shell running an empty command.
 fn calibrate(ctx: *Ctx) Stop!metric.Sample {
-    const argv = try withCommand(ctx, try shellPrefix(ctx, ctx.opts.shell), "");
+    const l = try launch(ctx, "", ctx.opts.shell);
     var sum: metric.Sample = .{};
     for (0..shell_calibration_runs) |_| {
         var why: []const u8 = "";
-        const s = proc.measure(ctx.io, .{ .argv = argv, .environ_map = null, .input = .null, .output = .null }, &why) catch |e| switch (e) {
+        const s = proc.measure(ctx.io, ctx.gpa, .{ .argv = l.argv, .raw_line = l.raw_line, .environ_map = null, .input = .null, .output = .null }, &why) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
-            else => return stop(ctx, "could not start the shell '{s}': {s}", .{ argv[0], why }),
+            else => return stop(ctx, "could not start the shell '{s}': {s}", .{ l.argv[0], why }),
         };
         for (std.enums.values(Metric)) |m| sum.values.set(m, sum.values.get(m) + s.values.get(m));
     }
@@ -351,7 +397,7 @@ fn writeExport(ctx: *Ctx, path: []const u8, kind: ExportKind, results: []const r
     var text: std.Io.Writer.Allocating = .init(ctx.arena);
     const w = &text.writer;
     switch (kind) {
-        .json => try report.json(w, results, &ctx.opts.metrics, .{ .start_time = start_time }),
+        .json => try report.json(w, results, &ctx.opts.metrics, .{ .version = ctx.version, .start_time = start_time }),
         .csv => try report.csv(w, results, &ctx.opts.metrics),
         .markdown => try report.table(w, .markdown, results, &ctx.opts.metrics, units),
         .asciidoc => try report.table(w, .asciidoc, results, &ctx.opts.metrics, units),

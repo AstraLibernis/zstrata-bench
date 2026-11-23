@@ -8,6 +8,10 @@
 //! tree's peak committed memory; the process itself gives its peak working set.
 //! Unix: rusage of the waited child (CPU time, max RSS, page faults).
 //! Wall time runs from just before the start to the end of the wait, as in hyperfine.
+//!
+//! A command for cmd.exe is started with its command line exactly as written (`Run.raw_line`):
+//! cmd.exe does not read the C runtime's quoting that std applies to each argument, so
+//! `bash -c "a > b"` would reach it mangled. Everything else goes through std.process.spawn.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -22,15 +26,19 @@ pub fn nowNs(io: std.Io) u64 {
 
 pub const Run = struct {
     argv: []const []const u8,
+    /// Windows only: the whole command line, passed to CreateProcessW unchanged. Overrides argv.
+    raw_line: ?[]const u8 = null,
     environ_map: ?*const std.process.Environ.Map,
     input: cli.Input,
     output: cli.Stream,
 };
 
-pub const Error = error{ JobObject, SpawnFailed, OutputFile, InputFile } || std.mem.Allocator.Error;
+pub const Error = error{ JobObject, SpawnFailed, OutputFile, InputFile, InvalidCommandLine } || std.mem.Allocator.Error;
 
-/// Runs the command once and measures it. `failure` gets the OS error name when the start fails.
-pub fn measure(io: std.Io, run: Run, failure: *[]const u8) Error!metric.Sample {
+/// Runs the command once and measures it. `failure` gets the OS error when the start fails.
+/// `scratch` holds the converted command line and environment for a raw start; the caller
+/// owns and frees it (an arena reset per run, or the run's own arena).
+pub fn measure(io: std.Io, scratch: std.mem.Allocator, run: Run, failure: *[]const u8) Error!metric.Sample {
     var stdin_file: ?std.Io.File = null;
     defer if (stdin_file) |f| f.close(io);
     var out_file: ?std.Io.File = null;
@@ -48,6 +56,9 @@ pub fn measure(io: std.Io, run: Run, failure: *[]const u8) Error!metric.Sample {
             return error.OutputFile;
         },
         else => {},
+    }
+    if (is_windows) {
+        if (run.raw_line) |line| return measureWindowsRaw(io, scratch, line, run, stdin_file, out_file, failure);
     }
     const stdin: std.process.SpawnOptions.StdIo = if (stdin_file) |f| .{ .file = f } else .ignore;
     const stdout: std.process.SpawnOptions.StdIo = switch (run.output) {
@@ -152,16 +163,20 @@ fn measureWindows(io: std.Io, options: std.process.SpawnOptions, failure: *[]con
     _ = win.WaitForSingleObject(child.id.?, win.INFINITE);
     // The clock stops when the process has ended, before the bookkeeping below.
     const t1 = nowNs(io);
-    var code: u32 = 0;
-    const have_code = win.GetExitCodeProcess(child.id.?, &code).toBool();
+    var s: metric.Sample = .{};
+    finishWindows(job, child.id.?, t1 -| t0, &s);
     _ = child.wait(io) catch |err| {
         failure.* = @errorName(err);
         return error.SpawnFailed;
     };
+    return s;
+}
 
-    var s: metric.Sample = .{};
-    s.values.set(.time_wall_clock, seconds(t1 -| t0));
-    s.exit_code = if (have_code) @as(i32, @bitCast(code)) else null;
+/// Fills `s` from the ended process and its job. The process handle must still be open.
+fn finishWindows(job: std.os.windows.HANDLE, process: std.os.windows.HANDLE, wall_ns: u64, s: *metric.Sample) void {
+    s.values.set(.time_wall_clock, seconds(wall_ns));
+    var code: u32 = 0;
+    s.exit_code = if (win.GetExitCodeProcess(process, &code).toBool()) @as(i32, @bitCast(code)) else null;
 
     var acct: win.BasicAndIoAccounting = undefined;
     if (win.QueryInformationJobObject(job, .basic_and_io_accounting, &acct, @sizeOf(win.BasicAndIoAccounting), null).toBool()) {
@@ -179,44 +194,163 @@ fn measureWindows(io: std.Io, options: std.process.SpawnOptions, failure: *[]con
     if (win.QueryInformationJobObject(job, .extended_limit, &ext, @sizeOf(win.ExtendedLimit), null).toBool()) {
         s.values.set(.memory_peak_commit, @floatFromInt(ext.peak_job_memory_used));
     }
-    if (comptime is_windows) {
-        if (child.resource_usage_statistics.rusage) |vm| s.values.set(.memory_peak_resident, @floatFromInt(vm.PeakWorkingSetSize));
+    var pmc: win.ProcessMemoryCounters = undefined;
+    pmc.cb = @sizeOf(win.ProcessMemoryCounters);
+    if (win.K32GetProcessMemoryInfo(process, &pmc, @sizeOf(win.ProcessMemoryCounters)).toBool()) {
+        s.values.set(.memory_peak_resident, @floatFromInt(pmc.peak_working_set_size));
     }
-    return s;
 }
 
-pub const HookError = error{ HookFailed, SpawnFailed } || std.mem.Allocator.Error;
+/// A handle the child may inherit: a duplicate of `h`, closed by the caller after the start.
+fn inheritable(h: std.os.windows.HANDLE) ?std.os.windows.HANDLE {
+    var dup: std.os.windows.HANDLE = undefined;
+    const self = win.GetCurrentProcess();
+    if (!win.DuplicateHandle(self, h, self, &dup, 0, .TRUE, win.DUPLICATE_SAME_ACCESS).toBool()) return null;
+    return dup;
+}
 
-/// Runs a setup/prepare/conclude/cleanup command through `shell_prefix` with output discarded.
-/// Returns its wall time in seconds; a non-zero exit is error.HookFailed (`code` holds it).
-pub fn hook(io: std.Io, argv: []const []const u8, environ_map: ?*const std.process.Environ.Map, code: *?i64, failure: *[]const u8) HookError!f64 {
-    const t0 = nowNs(io);
-    var child = std.process.spawn(io, .{
-        .argv = argv,
-        .environ_map = environ_map,
-        .stdin = .ignore,
-        .stdout = .ignore,
-        .stderr = .ignore,
-    }) catch |err| {
-        failure.* = @errorName(err);
-        return error.SpawnFailed;
+/// Holds the last start-failure message with its Windows error code. One timer runs one command
+/// at a time, so one buffer is enough.
+var error_text: [160]u8 = undefined;
+
+fn lastError(failure: *[]const u8, what: []const u8) void {
+    failure.* = std.mem.print(&error_text, "{s} (Windows error {d})", .{ what, win.GetLastError() }) catch what;
+}
+
+/// CreateProcessW with `line` as written. Standard handles: NUL, the given files, a pipe whose
+/// read end is drained here, or this process's own.
+fn measureWindowsRaw(io: std.Io, scratch: std.mem.Allocator, line: []const u8, run: Run, stdin_file: ?std.Io.File, out_file: ?std.Io.File, failure: *[]const u8) Error!metric.Sample {
+    const w = std.os.windows;
+    const line_w = std.unicode.wtf8ToWtf16LeAllocZ(scratch, line) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidWtf8 => return error.InvalidCommandLine,
     };
-    const term = child.wait(io) catch |err| {
-        failure.* = @errorName(err);
-        return error.SpawnFailed;
+    defer scratch.free(line_w);
+    var env_block: ?std.process.Environ.WindowsBlock = null;
+    defer if (env_block) |b| b.deinit(scratch);
+    if (run.environ_map) |m| env_block = m.createWindowsBlock(scratch, .{}) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidWtf8 => return error.InvalidCommandLine,
     };
-    const t1 = nowNs(io);
-    switch (term) {
-        .exited => |c| if (c != 0) {
-            code.* = c;
-            return error.HookFailed;
+
+    var sa: w.SECURITY_ATTRIBUTES = .{ .nLength = @sizeOf(w.SECURITY_ATTRIBUTES), .lpSecurityDescriptor = null, .bInheritHandle = .TRUE };
+    // Handles given to the child; all closed right after the start so a pipe sees its end.
+    var given: [4]w.HANDLE = undefined;
+    var n_given: usize = 0;
+    var closed = false;
+    defer if (!closed) for (given[0..n_given]) |h| w.CloseHandle(h);
+
+    const nul = win.CreateFileW(std.unicode.utf8ToUtf16LeStringLiteral("NUL"), win.GENERIC_READ | win.GENERIC_WRITE, win.FILE_SHARE_READ | win.FILE_SHARE_WRITE, &sa, win.OPEN_EXISTING, 0, null);
+    if (nul == w.INVALID_HANDLE_VALUE) {
+        lastError(failure, "cannot open NUL");
+        return error.SpawnFailed;
+    }
+    given[n_given] = nul;
+    n_given += 1;
+
+    var stdin_h = nul;
+    if (stdin_file) |f| {
+        stdin_h = inheritable(f.handle) orelse {
+            lastError(failure, "DuplicateHandle failed");
+            return error.SpawnFailed;
+        };
+        given[n_given] = stdin_h;
+        n_given += 1;
+    }
+    var pipe_read: ?w.HANDLE = null;
+    defer if (pipe_read) |h| w.CloseHandle(h);
+    var stdout_h = nul;
+    var stderr_h = nul;
+    switch (run.output) {
+        .null => {},
+        .file => {
+            stdout_h = inheritable(out_file.?.handle) orelse {
+                lastError(failure, "DuplicateHandle failed");
+                return error.SpawnFailed;
+            };
+            given[n_given] = stdout_h;
+            n_given += 1;
+            stderr_h = stdout_h;
         },
-        else => {
-            code.* = null;
-            return error.HookFailed;
+        .pipe => {
+            var r: w.HANDLE = undefined;
+            var wr: w.HANDLE = undefined;
+            if (!win.CreatePipe(&r, &wr, &sa, 0).toBool()) {
+                lastError(failure, "CreatePipe failed");
+                return error.SpawnFailed;
+            }
+            pipe_read = r;
+            given[n_given] = wr;
+            n_given += 1;
+            stdout_h = wr;
+            // Only the write end goes to the child.
+            _ = win.SetHandleInformation(r, win.HANDLE_FLAG_INHERIT, 0);
+        },
+        .inherit => {
+            if (win.GetStdHandle(win.STD_OUTPUT_HANDLE)) |h| if (h != w.INVALID_HANDLE_VALUE) if (inheritable(h)) |d| {
+                stdout_h = d;
+                given[n_given] = d;
+                n_given += 1;
+            };
+            if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |h| if (h != w.INVALID_HANDLE_VALUE) if (inheritable(h)) |d| {
+                stderr_h = d;
+                given[n_given] = d;
+                n_given += 1;
+            };
         },
     }
-    return seconds(t1 -| t0);
+
+    var si = std.mem.zeroes(w.STARTUPINFOW);
+    si.cb = @sizeOf(w.STARTUPINFOW);
+    si.dwFlags = w.STARTF_USESTDHANDLES;
+    si.hStdInput = stdin_h;
+    si.hStdOutput = stdout_h;
+    si.hStdError = stderr_h;
+    var pi: w.PROCESS.INFORMATION = undefined;
+
+    const job = win.CreateJobObjectW(null, null) orelse {
+        failure.* = "CreateJobObjectW failed";
+        return error.JobObject;
+    };
+    defer w.CloseHandle(job);
+
+    const t0 = nowNs(io);
+    const started = w.kernel32.CreateProcessW(
+        null,
+        line_w.ptr,
+        null,
+        null,
+        .TRUE,
+        .{ .create_suspended = true, .create_unicode_environment = true },
+        if (env_block) |b| b.slice.ptr else null,
+        null,
+        &si,
+        &pi,
+    ).toBool();
+    for (given[0..n_given]) |h| w.CloseHandle(h);
+    closed = true;
+    if (!started) {
+        lastError(failure, "CreateProcessW failed (the shell was not found or the command line is invalid)");
+        return error.SpawnFailed;
+    }
+    defer w.CloseHandle(pi.hProcess);
+    defer w.CloseHandle(pi.hThread);
+    if (!win.AssignProcessToJobObject(job, pi.hProcess).toBool() or win.ResumeThread(pi.hThread) == std.math.maxInt(u32)) {
+        _ = win.TerminateProcess(pi.hProcess, 1);
+        _ = win.WaitForSingleObject(pi.hProcess, win.INFINITE);
+        failure.* = "AssignProcessToJobObject or ResumeThread failed";
+        return error.JobObject;
+    }
+    if (pipe_read) |r| {
+        var buf: [16 * 1024]u8 = undefined;
+        var got: u32 = 0;
+        while (win.ReadFile(r, &buf, buf.len, &got, null).toBool() and got > 0) {}
+    }
+    _ = win.WaitForSingleObject(pi.hProcess, win.INFINITE);
+    const t1 = nowNs(io);
+    var s: metric.Sample = .{};
+    finishWindows(job, pi.hProcess, t1 -| t0, &s);
+    return s;
 }
 
 /// The Win32 calls std does not wrap. Referenced only on Windows.
@@ -224,6 +358,15 @@ const win = struct {
     const w = std.os.windows;
 
     const INFINITE: u32 = 0xFFFF_FFFF;
+    const GENERIC_READ: u32 = 0x8000_0000;
+    const GENERIC_WRITE: u32 = 0x4000_0000;
+    const FILE_SHARE_READ: u32 = 1;
+    const FILE_SHARE_WRITE: u32 = 2;
+    const OPEN_EXISTING: u32 = 3;
+    const HANDLE_FLAG_INHERIT: u32 = 1;
+    const DUPLICATE_SAME_ACCESS: u32 = 2;
+    const STD_OUTPUT_HANDLE: u32 = @bitCast(@as(i32, -11));
+    const STD_ERROR_HANDLE: u32 = @bitCast(@as(i32, -12));
 
     const JobInfoClass = enum(c_int) {
         basic_and_io_accounting = 8,
@@ -276,12 +419,26 @@ const win = struct {
         peak_job_memory_used: usize,
     };
 
+    const ProcessMemoryCounters = extern struct {
+        cb: u32,
+        page_fault_count: u32,
+        peak_working_set_size: usize,
+        working_set_size: usize,
+        quota_peak_paged_pool_usage: usize,
+        quota_paged_pool_usage: usize,
+        quota_peak_non_paged_pool_usage: usize,
+        quota_non_paged_pool_usage: usize,
+        pagefile_usage: usize,
+        peak_pagefile_usage: usize,
+    };
+
     comptime {
         // The layouts Windows documents for 64-bit processes.
         if (builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .aarch64) {
             std.debug.assert(@sizeOf(BasicAndIoAccounting) == 96);
             std.debug.assert(@sizeOf(BasicLimit) == 64);
             std.debug.assert(@sizeOf(ExtendedLimit) == 144);
+            std.debug.assert(@sizeOf(ProcessMemoryCounters) == 72);
         }
     }
 
@@ -291,4 +448,14 @@ const win = struct {
     extern "kernel32" fn ResumeThread(thread: w.HANDLE) callconv(.winapi) u32;
     extern "kernel32" fn WaitForSingleObject(handle: w.HANDLE, milliseconds: u32) callconv(.winapi) u32;
     extern "kernel32" fn GetExitCodeProcess(process: w.HANDLE, code: *u32) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn TerminateProcess(process: w.HANDLE, code: u32) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn K32GetProcessMemoryInfo(process: w.HANDLE, counters: *ProcessMemoryCounters, size: u32) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn CreateFileW(name: [*:0]const u16, access: u32, share: u32, security: ?*w.SECURITY_ATTRIBUTES, disposition: u32, flags: u32, template: ?w.HANDLE) callconv(.winapi) w.HANDLE;
+    extern "kernel32" fn CreatePipe(read: *w.HANDLE, write: *w.HANDLE, security: ?*w.SECURITY_ATTRIBUTES, size: u32) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn SetHandleInformation(handle: w.HANDLE, mask: u32, flags: u32) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn ReadFile(handle: w.HANDLE, buffer: [*]u8, len: u32, read: *u32, overlapped: ?*anyopaque) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn GetStdHandle(which: u32) callconv(.winapi) ?w.HANDLE;
+    extern "kernel32" fn GetCurrentProcess() callconv(.winapi) w.HANDLE;
+    extern "kernel32" fn DuplicateHandle(source_process: w.HANDLE, source: w.HANDLE, target_process: w.HANDLE, target: *w.HANDLE, access: u32, inherit: w.BOOL, options: u32) callconv(.winapi) w.BOOL;
+    extern "kernel32" fn GetLastError() callconv(.winapi) u32;
 };

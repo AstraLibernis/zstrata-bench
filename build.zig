@@ -42,6 +42,11 @@ pub fn build(b: *std.Build) void {
     for (shaders) |name| {
         mod.addAnonymousImport(b.fmt("{s}.spv", .{name}), .{ .root_source_file = compileShader(b, name) });
     }
+    // The version printed by `--version` and written into exports comes from build.zig.zon.
+    const build_options = b.addOptions();
+    build_options.addOption([]const u8, "version", @import("build.zig.zon").version);
+    mod.addOptions("build_options", build_options);
+
     const exe = b.addExecutable(.{ .name = "zstrata-bench", .root_module = mod });
     b.installArtifact(exe);
 

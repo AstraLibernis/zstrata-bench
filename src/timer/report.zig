@@ -98,6 +98,8 @@ fn factorText(buf: []u8, mean: f64, reference: f64, kind: metric.Kind) ?[]const 
 }
 
 pub const Meta = struct {
+    /// zstrata-bench's version.
+    version: []const u8,
     /// Seconds since 1970, UTC.
     start_time: i64,
 };
@@ -123,7 +125,9 @@ fn jsonString(w: *std.Io.Writer, s: []const u8) !void {
 
 /// hyperfine 2.0's JSON (schema 2), with every metric this OS reports. Values in base units.
 pub fn json(w: *std.Io.Writer, results: []const Result, selected: *const metric.Selected, meta: Meta) !void {
-    try w.print("{{\n  \"schema_version\": 2,\n  \"metadata\": {{\n    \"tool\": \"zstrata-bench time\",\n    \"zig_version\": \"{s}\",\n    \"start_time\": \"", .{builtin.zig_version_string});
+    try w.writeAll("{\n  \"schema_version\": 2,\n  \"metadata\": {\n    \"tool\": \"zstrata-bench time\",\n    \"tool_version\": ");
+    try jsonString(w, meta.version);
+    try w.print(",\n    \"zig_version\": \"{s}\",\n    \"start_time\": \"", .{builtin.zig_version_string});
     try writeIsoTime(w, meta.start_time);
     try w.print("\",\n    \"platform\": {{\n      \"os\": \"{s}\",\n      \"architecture\": \"{s}\"\n    }}\n  }},\n", .{ @tagName(builtin.os.tag), @tagName(builtin.cpu.arch) });
     try w.print("  \"primary_metric\": \"{s}\",\n  \"results\": [", .{@tagName(selected.primary().metric)});
