@@ -24,7 +24,12 @@ zig-out/bin/zstrata-bench run D1                           # measure; each resul
 zig-out/bin/zstrata-bench check                            # what is saved, stale or missing
 zig-out/bin/zstrata-bench look group total --rows 1e7      # the measured answer for a job
 zig-out/bin/zstrata-bench map                              # all answers to map/<machine>.tsv
+zig-out/bin/zstrata-bench time 'prog a' 'prog b'           # time whole programs, hyperfine-style
 ```
+
+`time` measures any program from outside with hyperfine 2.0's options and JSON layout, and adds
+what hyperfine cannot read on Windows: peak memory of the process and of its whole process
+tree, page faults, process count and I/O bytes. See [`docs/TIMER.md`](docs/TIMER.md).
 
 Needs Zig 0.17.x and, to build, the shader compiler `glslc` (set `VKPREFIX` to the folder that
 holds `bin/glslc`). The GPU variants need a Vulkan 1.3 graphics card; without one they are

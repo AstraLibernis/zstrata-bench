@@ -18,6 +18,7 @@ src/main.zig                 commands: run, look, list, check
 src/harness.zig              timing, repeats, spread, disturbance check, saved results
 src/profile.zig              reads the machine facts zstrata measured
 src/data.zig                 seeded input generators (same input every run)
+src/timer/                   `time`: whole programs timed from outside (docs/TIMER.md)
 src/jobs/<group>/<job>.zig   one file per job: spec, reference, variants
 shaders/                     GPU variants
 verify/<job>.py              the outside check (NumPy / pandas / SciPy)
@@ -38,6 +39,7 @@ zig build run -- look "group by" --rows 1e7               the recommended way, w
 zig build run -- list                                     jobs, variants, what is measured
 zig build run -- check                                    results that are stale or missing
 zig build test                                            Debug: every variant equals its reference
+zig build run -Doptimize=ReleaseFast -- time 'prog a' 'prog b'   time whole programs (docs/TIMER.md)
 ```
 
 ## Adding a job

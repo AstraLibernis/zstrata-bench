@@ -1,6 +1,6 @@
 # zstrata-bench plan
 
-Status: **B0 to B6 done** (2026-11-19): harness, the map and `look`, 25 jobs on the CPU (data D1 to D7, data science S1 to S6, model learning M1 to M6, vectorisation V1 to V3), and GPU variants for S5, S6, M3, M4 and M6. Next: B7 (LLM and zmural slices, when that work is live) and B8 (using it). Open items: docs/notes/open-items-2026-11-19.md.
+Status: **B0 to B6 done** (2026-11-19): harness, the map and `look`, 25 jobs on the CPU (data D1 to D7, data science S1 to S6, model learning M1 to M6, vectorisation V1 to V3), and GPU variants for S5, S6, M3, M4 and M6. T, the program timer (`time`), done 2026-11-23. Next: B7 (LLM and zmural slices, when that work is live) and B8 (using it). Open items: docs/notes/open-items-2026-11-19.md.
 
 ## What this is
 
@@ -148,6 +148,9 @@ Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` tick
   and without transfer cost, and the best-practices layer on in tests.
 - **B6 Remaining data jobs ✓ (2026-11-19).** D6, D7.
 - **V Vectorisation ✓ (2026-11-19).** V1 to V3: this Zig does not vectorise loops; written-out vectors are the fix and are portable (docs/measurements.md, "Vectorisation").
+- **T Program timer ✓ (2026-11-23).** `zstrata-bench time`: whole programs timed from outside
+  with hyperfine 2.0's options, statistics and JSON layout, plus Windows job-object metrics
+  (process-tree memory, faults, processes, I/O). Checked against hyperfine: docs/TIMER.md.
 - **B7 LLM and zmural slices.** Only when that work is live.
 - **B8 Use it.** Add the lookup to the Zig working habit (the zcanon skill text), and apply
   results to a project when that project is next worked on. Both touch other repos: ask first.

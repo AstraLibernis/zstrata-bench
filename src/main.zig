@@ -8,6 +8,7 @@ const std = @import("std");
 const harness = @import("harness.zig");
 const jobs = @import("jobs.zig");
 const map = @import("map.zig");
+const timer = @import("timer/timer.zig");
 const Job = harness.Job;
 const Env = harness.Env;
 
@@ -29,6 +30,9 @@ const usage =
     \\  answer <job> <n>  the reference answer for n items (for the outside checks in verify/)
     \\  one <job> <variant> <n>
     \\                    build the input and run one variant once (for timing from outside)
+    \\  time [options] <command>...
+    \\                    time whole programs from outside, hyperfine-style, with process-tree
+    \\                    memory on Windows (`time --help`, docs/TIMER.md)
     \\
 ;
 
@@ -45,6 +49,20 @@ pub fn main(init: std.process.Init) !void {
     var buf: [4096]u8 = undefined;
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &buf);
     const out = &stdout.interface;
+
+    if (argv.len >= 2 and std.mem.eql(u8, argv[1], "time")) {
+        var ebuf: [1024]u8 = undefined;
+        var stderr = std.Io.File.stderr().writerStreaming(init.io, &ebuf);
+        const tcode = timer.main(gpa, init.io, init.environ_map, argv[2..], out, &stderr.interface) catch |err| blk: {
+            try out.flush();
+            try stderr.interface.print("error: {s}\n", .{@errorName(err)});
+            break :blk 1;
+        };
+        try out.flush();
+        try stderr.interface.flush();
+        if (tcode != 0) std.process.exit(tcode);
+        return;
+    }
 
     const code = command(gpa, init.io, argv, out) catch |err| blk: {
         try out.flush();
@@ -267,6 +285,7 @@ test {
     _ = @import("data.zig");
     _ = @import("jobs.zig");
     _ = @import("map.zig");
+    _ = @import("timer/timer.zig");
 }
 
 test "parseSize" {
