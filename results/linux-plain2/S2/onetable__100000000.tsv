@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S2	onetable	100000000	24085333.000	24045823.000	0.0008	13	4.1519e9	12850690460	9c7c946cfcabded0	0.17.1

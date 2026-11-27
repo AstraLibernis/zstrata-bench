@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M6	threeloops	50000000	100926110.000	100895770.000	0.0004	5	4.9541e8	2620.966639570636	54a81209e26bb5e6	0.17.1

@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M5	weightfirst	16384	53802417.000	53510527.000	0.0247	6	3.0452e5	9.352308834757423	37542934e6159d72	0.17.1

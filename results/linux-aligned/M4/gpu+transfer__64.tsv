@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M4	gpu+transfer	64	80903.667	71389.417	0.0335	31	7.9106e5	2105.1905114911497	c2849de35bfa2a7d	0.17.1

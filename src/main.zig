@@ -9,6 +9,7 @@ const harness = @import("harness.zig");
 const jobs = @import("jobs.zig");
 const map = @import("map.zig");
 const timer = @import("timer/timer.zig");
+const aligned = @import("aligned.zig");
 const Job = harness.Job;
 const Env = harness.Env;
 
@@ -44,7 +45,10 @@ const Options = struct {
 };
 
 pub fn main(init: std.process.Init) !void {
-    const gpa = init.gpa;
+    // Every block on a cache-line boundary (aligned.zig): glibc's malloc does not do that.
+    // ZSB_PLAIN_ALLOC=1 turns it off, to measure what that costs.
+    var aligning: aligned.Aligning = .{ .child = init.gpa };
+    const gpa = if (init.environ_map.get("ZSB_PLAIN_ALLOC") != null) init.gpa else aligning.allocator();
     const argv = try init.minimal.args.toSlice(init.arena.allocator());
     var buf: [4096]u8 = undefined;
     var stdout = std.Io.File.stdout().writerStreaming(init.io, &buf);
@@ -286,6 +290,7 @@ test {
     _ = @import("jobs.zig");
     _ = @import("map.zig");
     _ = @import("timer/timer.zig");
+    _ = aligned;
 }
 
 test "parseSize" {

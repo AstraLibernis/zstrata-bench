@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+V2	portable	1000000	52573.048	50967.333	0.0244	31	1.9021e10	-45.163780212402344	f6f87c691e844901	0.17.1

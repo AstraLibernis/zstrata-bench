@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M5	threads8	16384	4722709.000	4645299.000	0.0201	31	3.4692e6	9.352308834757423	37542934e6159d72	0.17.1

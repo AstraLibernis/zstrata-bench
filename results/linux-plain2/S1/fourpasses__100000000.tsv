@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S1	fourpasses	100000000	282736541.000	282479399.000	0.0003	5	3.5369e8	1.5834065977231817	e5e11e958edcdcf0	0.17.1

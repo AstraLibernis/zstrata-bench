@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+V1	fused16	1000	29.685	29.443	0.0091	31	3.3687e10	9.64573049545288	c5c53665b904d120	0.17.1

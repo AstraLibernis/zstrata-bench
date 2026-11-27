@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+D4	table	1000000	4685340.000	4656690.000	0.0047	31	2.1343e8	247007083.79430234	938b1e6c49f48022	0.17.1

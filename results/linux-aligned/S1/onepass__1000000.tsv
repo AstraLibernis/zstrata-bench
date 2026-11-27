@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S1	onepass	1000000	1051034.000	1043943.000	0.0043	31	9.5144e8	1.583224111729831	e5e11e958edcdcf0	0.17.1

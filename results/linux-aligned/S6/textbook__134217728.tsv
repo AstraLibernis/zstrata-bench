@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S6	textbook	134217728	142309247.000	142278886.000	0.0001	5	9.4314e8	33580363.62160492	3fbbbe28e81fdb9d	0.17.1

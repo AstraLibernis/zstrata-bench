@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M1	twotables	10000	50239.200	50081.200	0.0069	31	1.9905e8	11829927.154084623	31d6beb27caa5299	0.17.1
