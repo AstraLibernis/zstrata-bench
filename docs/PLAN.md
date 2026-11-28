@@ -172,10 +172,12 @@ met.
 - **A change counts** only when it beats the noise floor in a repeat and has a named cause
   (example: `src/aligned.zig`, 26 rows past the noise floor, all 16-wide loops on cached data).
 
-State on 2026-11-27: job medians 0.98-1.03, overall 1.00. D6 `std` and D7 `sort` at
-10,000 are `tried`. One row is open: S6 `gpu+transfer` at 2^27, 0.79x. That is the GPU download
-path, the same gap as zstrata's `link/download` item (1.14x), and it is worked on there. When that
-item is closed or `tried`, the Linux work here is finished.
+State on 2026-11-27 (evening): **target met** (`tools/ceiling.py` exit 0). Job medians
+0.98-1.03, overall 1.00. D6 `std` and D7 `sort` at 10,000 are `tried`. The last open row, S6
+`gpu+transfer`, was a code fault: the transpose wrote single floats with a row stride straight
+into the write-combined staging buffer. Built in cached memory and copied once, it runs 1.8x
+faster (now 1.43x Windows at 2^27). Linux work here is finished; rows are reopened only if a
+rerun puts them past the limits again.
 
 ## Decisions (owner, 2026-11-19)
 

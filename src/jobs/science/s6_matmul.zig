@@ -33,6 +33,10 @@ const Input = struct {
     /// Starts on a cache line. With a side that is a multiple of 32 every row is whole lines,
     /// so threads that own different rows never write the same line.
     c: []align(line) f32,
+    /// Ordinary cached memory where `stage` builds the transposed second matrix before one
+    /// sequential copy into the staging buffer: the staging buffer is write-combined on Linux,
+    /// where the transpose's strided single-float writes are slow (2026-11-27).
+    bt_tmp: []f32,
     /// Buffers on the graphics card, made the first time a GPU variant runs.
     card: ?Compute = null,
     /// The GPU result checked in the untimed run; reported again while the result stays on the card.
@@ -62,11 +66,13 @@ fn stage(in: *Input, c: *Compute) void {
     const a = c.input(0, f32);
     const bt = c.input(1, f32);
     @memset(a, 0);
-    @memset(bt, 0);
     for (0..n) |i| @memcpy(a[i * padded ..][0..n], in.a[i * n ..][0..n]);
+    const tmp = in.bt_tmp[0..bt.len];
+    @memset(tmp, 0);
     for (0..n) |k| {
-        for (0..n) |j| bt[j * padded + k] = in.b[k * n + j];
+        for (0..n) |j| tmp[j * padded + k] = in.b[k * n + j];
     }
+    @memcpy(bt, tmp);
 }
 
 /// The card-side state, created on first use with the inputs already uploaded.
@@ -125,15 +131,18 @@ fn create(gpa: std.mem.Allocator, n: usize) anyerror!*anyopaque {
     const b = try gpa.alloc(f32, side * side);
     errdefer gpa.free(b);
     const c = try gpa.alignedAlloc(f32, .fromByteUnits(line), side * side);
+    errdefer gpa.free(c);
+    const bt_tmp = try gpa.alloc(f32, side * quadsOf(side) * 4);
     data.fillUnit(a, 40);
     data.fillUnit(b, 41);
-    in.* = .{ .side = side, .a = a, .b = b, .c = c };
+    in.* = .{ .side = side, .a = a, .b = b, .c = c, .bt_tmp = bt_tmp };
     return in;
 }
 
 fn destroy(gpa: std.mem.Allocator, p: *anyopaque) void {
     const in = of(p);
     if (in.card) |*c| c.deinit();
+    gpa.free(in.bt_tmp);
     gpa.free(in.c);
     gpa.free(in.b);
     gpa.free(in.a);

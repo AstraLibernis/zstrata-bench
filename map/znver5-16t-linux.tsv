@@ -82,18 +82,18 @@ S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000
 S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	gpu	gpu	2.3935e11	320.76	gpu+transfer	2.2871e11	graphics card, data already on it, result left on it
 S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	gpu	gpu+transfer	2.2871e11	306.50	gpu	2.3935e11	graphics card, from main memory and back
 S5	nearest neighbour distance for every point, 8 dimensions, all pairs	256000000	pairs	all	threads8	6.1911e10	82.97	threads16	5.1781e10	points16 on 8 threads
-S6	multiply two square matrices	2097152	multiply-adds	one	fused4	3.6114e10	10.82	lanes16	2.7151e10	fused, four rows of the second matrix per pass
-S6	multiply two square matrices	2097152	multiply-adds	gpu	gpu	7.0780e10	21.20	gpu+transfer	1.2890e10	graphics card, matrices already on it, product left on it
-S6	multiply two square matrices	2097152	multiply-adds	gpu	gpu+transfer	1.2890e10	3.86	gpu	7.0780e10	graphics card, from main memory and back
-S6	multiply two square matrices	2097152	multiply-adds	all	threads8	1.4455e11	43.31	threads16	1.4158e11	fused4, result rows shared out over 8 threads
-S6	multiply two square matrices	134217728	multiply-adds	one	fused4	4.0566e10	39.59	lanes16	3.8309e10	fused, four rows of the second matrix per pass
-S6	multiply two square matrices	134217728	multiply-adds	gpu	gpu	1.2122e12	1183.10	gpu+transfer	5.3371e10	graphics card, matrices already on it, product left on it
-S6	multiply two square matrices	134217728	multiply-adds	gpu	gpu+transfer	5.3371e10	52.09	gpu	1.2122e12	graphics card, from main memory and back
-S6	multiply two square matrices	134217728	multiply-adds	all	threads8	2.1488e11	209.72	threads16	2.0781e11	fused4, result rows shared out over 8 threads
-S6	multiply two square matrices	1073741824	multiply-adds	one	lanes16	4.4355e10	129.56	fused	4.3038e10	tiled, inner step written as 16-wide vectors
-S6	multiply two square matrices	1073741824	multiply-adds	gpu	gpu	1.3367e12	3904.29	gpu+transfer	1.0180e11	graphics card, matrices already on it, product left on it
-S6	multiply two square matrices	1073741824	multiply-adds	gpu	gpu+transfer	1.0180e11	297.35	gpu	1.3367e12	graphics card, from main memory and back
-S6	multiply two square matrices	1073741824	multiply-adds	all	threads8	2.7913e11	815.33	threads16	2.4857e11	fused4, result rows shared out over 8 threads
+S6	multiply two square matrices	2097152	multiply-adds	one	fused4	3.6337e10	10.88	fused	2.7352e10	fused, four rows of the second matrix per pass
+S6	multiply two square matrices	2097152	multiply-adds	gpu	gpu	7.1644e10	21.45	gpu+transfer	2.2237e10	graphics card, matrices already on it, product left on it
+S6	multiply two square matrices	2097152	multiply-adds	gpu	gpu+transfer	2.2237e10	6.66	gpu	7.1644e10	graphics card, from main memory and back
+S6	multiply two square matrices	2097152	multiply-adds	all	threads8	1.4433e11	43.21	threads16	1.3749e11	fused4, result rows shared out over 8 threads
+S6	multiply two square matrices	134217728	multiply-adds	one	fused4	4.0528e10	39.19	lanes16	3.8552e10	fused, four rows of the second matrix per pass
+S6	multiply two square matrices	134217728	multiply-adds	gpu	gpu	1.2072e12	1167.36	gpu+transfer	9.8194e10	graphics card, matrices already on it, product left on it
+S6	multiply two square matrices	134217728	multiply-adds	gpu	gpu+transfer	9.8194e10	94.95	gpu	1.2072e12	graphics card, from main memory and back
+S6	multiply two square matrices	134217728	multiply-adds	all	threads8	2.4071e11	232.76	threads16	2.3388e11	fused4, result rows shared out over 8 threads
+S6	multiply two square matrices	1073741824	multiply-adds	one	lanes16	4.7857e10	142.36	fused	4.3886e10	tiled, inner step written as 16-wide vectors
+S6	multiply two square matrices	1073741824	multiply-adds	gpu	gpu	1.3461e12	4004.32	gpu+transfer	1.2953e11	graphics card, matrices already on it, product left on it
+S6	multiply two square matrices	1073741824	multiply-adds	gpu	gpu+transfer	1.2953e11	385.32	gpu	1.3461e12	graphics card, from main memory and back
+S6	multiply two square matrices	1073741824	multiply-adds	all	threads8	2.8100e11	835.90	threads16	2.5873e11	fused4, result rows shared out over 8 threads
 M1	tree histogram build: gradients into 256 bins for 8 features	10000	rows	one	sidebyside	3.6925e8	1.65	pieces	3.6559e8	one pass per feature; each bin's two sums side by side
 M1	tree histogram build: gradients into 256 bins for 8 features	10000	rows	all	threads8	5.4032e8	2.41	threads16	5.1114e8	pieces in 16 parts with their own histograms, 8 threads
 M1	tree histogram build: gradients into 256 bins for 8 features	1000000	rows	one	sidebyside	3.7464e8	1.64	pieces	3.7897e8	one pass per feature; each bin's two sums side by side

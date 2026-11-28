@@ -694,3 +694,13 @@ is written from it. Ceiling check: `tools/ceiling.py` (PLAN.md, "Ceiling target"
   cause [INFERRED, not looked at in the disassembly].
 - **D7 `sort` at 10,000, 0.83x** in all four Linux sets (40 vs 33 us per call). Not page faults
   (221 per run). Cause not found; left as `tried`. [MEASURED]
+- **S6 `gpu+transfer`: fixed.** The kernel alone was 1.9x faster on Linux (1.21e12 vs 0.65e12
+  multiply-adds/s at 2^27), so the 0.79x was all in staging. `stage` wrote the transposed second
+  matrix one float at a time, a row apart, straight into the staging buffer, which is
+  host-visible and not host-cached (write-combined on Linux). Now the transpose is built in
+  ordinary memory and copied over in one sequential `@memcpy`, still inside the timed run.
+  2^27: 5.3e10 -> 9.7e10 multiply-adds/s (Windows, old code, 6.8e10); 2^30: 1.29e11 (Windows
+  1.12e11). [MEASURED] Windows has not run the new code. The other jobs that stage (S5, M3, M4,
+  M6) already write their staging buffers in order.
+- **Ceiling target met** after the S6 rerun: no job under 0.95, two rows under 0.85, both
+  `tried`. [MEASURED]
