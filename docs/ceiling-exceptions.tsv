@@ -1,0 +1,3 @@
+# pattern (job/variant/n, shell wildcards)	cause (power|driver|permission|tried|code)	reason
+D6/std/10000	tried	Build layout, not the OS: the pre-aligned.zig build (cc77d01) reads 3.85e9 on Linux, equal to Windows (same build); the current build 2.90e9, with ZSB_PLAIN_ALLOC=1 too (2026-11-27). Windows has not run the current build
+D7/sort/10000	tried	0.83x in all 4 Linux sets (40 vs 33 us per call); not page faults (221 per whole run, perf stat 2026-11-27). Cause not found; one experiment spent

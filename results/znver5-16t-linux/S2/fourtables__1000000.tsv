@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S2	fourtables	1000000	233071.000	232736.800	0.0015	31	4.2905e9	128468713	9c7c946cfcabded0	0.17.1

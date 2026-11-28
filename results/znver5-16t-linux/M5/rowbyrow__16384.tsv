@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+M5	rowbyrow	16384	212723266.000	212638305.000	0.0009	5	7.7020e4	9.352284163906006	37542934e6159d72	0.17.1

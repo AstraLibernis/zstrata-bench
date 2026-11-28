@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S2	bins16	100000000	22733214.000	22673424.000	0.0015	14	4.3989e9	12850690460	9c7c946cfcabded0	0.17.1

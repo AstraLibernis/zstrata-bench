@@ -155,6 +155,28 @@ Each milestone ends with: tests pass in Debug, results committed, `PLAN.md` tick
 - **B8 Use it.** Add the lookup to the Zig working habit (the zcanon skill text), and apply
   results to a project when that project is next worked on. Both touch other repos: ask first.
 
+## Ceiling target (Linux against Windows, set 2026-11-27)
+
+The target is **parity with Windows on the same machine, not beating it**. Rows where Linux is
+ahead are never work items. Check: `tools/ceiling.py` (Linux results against Windows'); exit 0 =
+met.
+
+- **Met when** no job's median Linux/Windows rate is under 0.95, and no row is under 0.85x beyond
+  both spreads. The exception is a row listed in `docs/ceiling-exceptions.tsv` whose cause lies
+  outside this code (`power`, `driver`, `permission`) or that is `tried`. 0.85 is the noise
+  floor: two identical plain Linux runs differ by 0.88-1.18x on 95% of rows.
+- **A row from a single full pass is first rerun once.** On 2026-11-27, 6 of 9 open rows (all of
+  V2 at n=100,000 at 0.66x, D2s `branch`) cleared on the rerun.
+- **Each remaining gap gets one bounded experiment**, recorded in the exceptions file. If it
+  does not close the gap, the gap is `tried` and work on it stops.
+- **A change counts** only when it beats the noise floor in a repeat and has a named cause
+  (example: `src/aligned.zig`, 26 rows past the noise floor, all 16-wide loops on cached data).
+
+State on 2026-11-27: job medians 0.98-1.03, overall 1.00. D6 `std` and D7 `sort` at
+10,000 are `tried`. One row is open: S6 `gpu+transfer` at 2^27, 0.79x. That is the GPU download
+path, the same gap as zstrata's `link/download` item (1.14x), and it is worked on there. When that
+item is closed or `tried`, the Linux work here is finished.
+
 ## Decisions (owner, 2026-11-19)
 
 1. **Z1, the `profile` export in zstrata: open.** Not decided yet. B0 does not need it: it reads

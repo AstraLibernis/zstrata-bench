@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S4	rowlayout	10000000	29715611.000	29626541.000	0.0007	11	3.3652e8	6.580544517251762	2bcb3e5dbad9c224	0.17.1

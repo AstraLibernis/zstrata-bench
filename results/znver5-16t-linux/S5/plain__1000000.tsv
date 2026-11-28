@@ -1,0 +1,2 @@
+job	variant	n	median_ns	min_ns	spread	runs	items_per_s	answer	stamp	zig
+S5	plain	1000000	1373486.000	1343825.000	0.0158	31	7.2807e8	8.262367305653697	6ae65371a3c33959	0.17.1

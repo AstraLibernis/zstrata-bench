@@ -1,6 +1,8 @@
 # First Linux run, stopping point (2026-11-27)
 
-Fedora 45, kernel 7.3.6, same machine as the Windows results. Stopped mid-comparison; nothing
+Fedora 45, kernel 7.3.6, same machine as the Windows results. **Superseded the same evening:** the
+comparison was finished from the saved runs; see docs/measurements.md, "Linux, same machine".
+Original note: stopped mid-comparison; nothing
 here is a conclusion yet.
 
 ## What is in this branch

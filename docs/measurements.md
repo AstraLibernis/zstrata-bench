@@ -665,3 +665,32 @@ What this adds to the list below:
 5. The graphics card wins large jobs when the data lives on it, and loses when little work is
    done per byte moved (see the GPU section).
 6. Tricks carried over from elsewhere need measuring here: two of them made things slower.
+
+## Linux, same machine (2026-11-27)
+
+Fedora 45, kernel 7.3.6, governor `performance`, EPP `performance`, load 0.4 before the run.
+`results/znver5-16t-linux`: one full pass with the aligning allocator under zstrata's custom GPU
+profile (`tools/linux-fullrun.sh`), then V2, D6, D7 and D2s rerun once. `map/znver5-16t-linux.tsv`
+is written from it. Ceiling check: `tools/ceiling.py` (PLAN.md, "Ceiling target").
+
+- **Parity.** 486 shared measurements, median Linux/Windows rate 1.00; every job median
+  0.98-1.03. [MEASURED]
+- **Noise floor.** Two identical plain runs: median 1.005, 95% of rows within 0.88-1.18x.
+  A single-run difference smaller than that is not a result. [MEASURED]
+- **Aligning allocator (`src/aligned.zig`) stays.** With libc linked, glibc `malloc` starts big
+  blocks 16 bytes into a cache line. Aligned against both plain runs: 26 rows faster past the
+  noise floor, up to 1.53x, all 16-wide loops on cache-resident data (M4 `dot16*`, V1/V2 at
+  1,000, M5, S6 `lanes16`/`fused`). Job medians M4 1.07, M5 1.15, the rest 0.99-1.01. Of 37
+  rows where plain Linux trailed Windows by over 15%, 24 come within 5%. [MEASURED]
+- **GPU rows** under the custom profile (GFXCLK min active 3300 MHz): S6 `gpu` at 2^30 and
+  S5 `gpu` are no longer behind; S6 `gpu+transfer` at 2^27 stays at 0.79x (the download path,
+  zstrata `link/download`). [MEASURED]
+- **A full pass can hit a slow stretch.** Every V2 variant at n=100,000 read 0.66x (0.3% spread)
+  in the full pass, and 1.0-1.3x of Windows when rerun alone, with or without the GPU profile.
+  Cause not found. Rerun a row from one pass before acting on it. [MEASURED]
+- **D6 `std` at 10,000, 0.76x, is the build, not the OS.** The build before `aligned.zig`
+  (cc77d01) reads 3.85e9 B/s on Linux, equal to Windows (which ran that build); the current
+  build reads 2.90e9 with the plain allocator as well. [MEASURED] Code layout is the likely
+  cause [INFERRED, not looked at in the disassembly].
+- **D7 `sort` at 10,000, 0.83x** in all four Linux sets (40 vs 33 us per call). Not page faults
+  (221 per run). Cause not found; left as `tried`. [MEASURED]
